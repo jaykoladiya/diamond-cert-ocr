@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diamond Certificate Portal</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --ink:#1b2430; --muted:#6b7684; --line:#e2e6ec;
+          --brand:#1f3a5f; --accent:#2f6fde; --warn:#fff4cc; --warnline:#e7c64a; --err:#c23b3b; --ok:#1e8e4e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--brand); color:#fff; padding:14px 24px; display:flex; align-items:center; gap:16px; }
+  header h1 { font-size:18px; margin:0; font-weight:600; letter-spacing:.2px; }
+  header .status { margin-left:auto; font-size:12.5px; display:flex; align-items:center; gap:8px; opacity:.95; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#999; display:inline-block; }
+  .dot.ok { background:#4cd685; } .dot.bad { background:#ff6b6b; }
+  main { padding:20px 24px; max-width:1600px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:18px; }
+  #drop { border:2px dashed #b8c2cf; border-radius:10px; padding:28px; text-align:center; color:var(--muted); cursor:pointer; transition:.15s; }
+  #drop.over { border-color:var(--accent); background:#eef4ff; color:var(--ink); }
+  #drop strong { color:var(--ink); font-size:15px; }
+  #queue { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { border:1px solid var(--line); background:#fafbfc; border-radius:999px; padding:4px 10px; font-size:12.5px; display:flex; gap:6px; align-items:center; }
+  .chip.done { border-color:#bfe5cf; background:#effaf3; } .chip.fail { border-color:#f1c0c0; background:#fdf1f1; color:var(--err); }
+  .chip.run::before { content:""; width:10px; height:10px; border:2px solid var(--accent); border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg);} }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  button { font:inherit; border:1px solid var(--line); background:#fff; padding:7px 14px; border-radius:7px; cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  button:hover:not(:disabled) { filter:brightness(.96); }
+  .spacer { flex:1; }
+  .muted { color:var(--muted); font-size:12.5px; }
+  .tablewrap { overflow:auto; max-height:62vh; border:1px solid var(--line); border-radius:8px; }
+  table { border-collapse:separate; border-spacing:0; width:max-content; min-width:100%; }
+  th, td { border-bottom:1px solid var(--line); border-right:1px solid var(--line); padding:0; white-space:nowrap; }
+  th { position:sticky; top:0; background:#eef1f5; font-weight:600; font-size:12.5px; padding:8px 10px; text-align:left; z-index:1; }
+  th.key::after { content:" *"; color:var(--err); }
+  td input { border:0; padding:7px 9px; font:inherit; width:100%; min-width:90px; background:transparent; }
+  td input:focus { outline:2px solid var(--accent); outline-offset:-2px; background:#fff; }
+  td.missing { background:var(--warn); box-shadow:inset 0 0 0 1px var(--warnline); }
+  td.ctrl { padding:0 6px; text-align:center; background:#fafbfc; position:sticky; left:0; z-index:0; }
+  td.ctrl button { padding:2px 7px; font-size:12px; }
+  tr.sel td { background:#eef4ff; } tr.sel td.missing { background:#ffeeb0; }
+  .empty { padding:30px; text-align:center; color:var(--muted); }
+  #viewer { display:none; grid-template-columns:1fr 1fr; gap:16px; }
+  #viewer.on { display:grid; }
+  #viewer img, #viewer iframe { width:100%; height:520px; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#fafafa; }
+  #viewer pre { margin:0; height:520px; overflow:auto; background:#0f1720; color:#d7e1ec; padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; }
+  .legend { display:inline-block; width:12px; height:12px; background:var(--warn); border:1px solid var(--warnline); vertical-align:-2px; margin-right:4px; }
+  #toast { position:fixed; bottom:20px; right:20px; background:#1b2430; color:#fff; padding:10px 14px; border-radius:8px; display:none; max-width:420px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>💎 Diamond Certificate Portal</h1>
+  <span class="muted" style="color:#c9d6e6">GIA · IGI · HRD · AGS · GCAL — Unlimited-OCR-2 or PaddleOCR</span>
+  <div class="status"><span id="dot" class="dot"></span><span id="statusText">Checking OCR engine…</span></div>
+</header>
+<main>
+  <section class="card">
+    <div id="drop">
+      <strong>Drop certificate files here</strong> or click to choose<br>
+      <span class="muted">PDF, JPG, PNG, TIFF, WEBP — one certificate per file, many files at once</span>
+      <input id="file" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.webp,.bmp" hidden>
+    </div>
+    <div id="queue"></div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="margin-bottom:12px">
+      <strong id="count">0 certificates</strong>
+      <span class="muted"><span class="legend"></span>key field missing: please check against the certificate</span>
+      <span class="spacer"></span>
+      <button id="addRow">+ Blank row</button>
+      <button id="clear">Clear all</button>
+      <button id="appendBtn" title="Add the rows under the matching headers of your own .xlsx">Append to my Excel…</button>
+      <input id="tpl" type="file" accept=".xlsx,.xlsm" hidden>
+      <button id="exportBtn" class="primary">Download Excel</button>
+    </div>
+    <div class="tablewrap"><table id="grid"></table></div>
+  </section>
+
+  <section class="card" id="viewerCard" style="display:none">
+    <div class="row" style="margin-bottom:10px"><strong id="viewerTitle"></strong><span class="spacer"></span><button id="closeViewer">Close</button></div>
+    <div id="viewer"><div id="preview"></div><pre id="ocrText"></pre></div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let COLUMNS = [], KEY = [];
+let rows = JSON.parse(localStorage.getItem("certRows") || "[]");   // {record, missing, markdown, id}
+const files = {};          // id -> File (for preview; not persisted)
+let selected = null;
+
+function toast(msg, ms = 3500) { const t = $("#toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", ms); }
+function save() { localStorage.setItem("certRows", JSON.stringify(rows)); }
+function uid() { return Math.random().toString(36).slice(2, 10); }
+
+async function init() {
+  const c = await (await fetch("/api/columns")).json();
+  COLUMNS = c.columns; KEY = c.key_fields;
+  render(); checkStatus(); setInterval(checkStatus, 15000);
+}
+async function checkStatus() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    $("#dot").className = "dot " + (s.ok ? "ok" : "bad");
+    $("#statusText").textContent = s.ok ? `OCR engine: ${s.label}` : s.label;
+  } catch { $("#dot").className = "dot bad"; $("#statusText").textContent = "Portal unreachable"; }
+}
+
+function render() {
+  const g = $("#grid");
+  $("#count").textContent = `${rows.length} certificate${rows.length === 1 ? "" : "s"}`;
+  if (!rows.length) { g.innerHTML = `<tr><td class="empty">No certificates yet: drop some files above.</td></tr>`; return; }
+  let h = "<thead><tr><th></th>" + COLUMNS.map(c => `<th class="${KEY.includes(c.key) ? "key" : ""}">${c.header}</th>`).join("") + "</tr></thead><tbody>";
+  rows.forEach((r, i) => {
+    h += `<tr data-i="${i}" class="${r.id === selected ? "sel" : ""}"><td class="ctrl"><button data-view="${i}" title="View certificate & OCR text">👁</button> <button data-del="${i}" title="Remove row">✕</button></td>`;
+    for (const c of COLUMNS) {
+      const v = r.record[c.key] ?? "";
+      const miss = KEY.includes(c.key) && (v === "" || v === null);
+      h += `<td class="${miss ? "missing" : ""}"><input data-k="${c.key}" value="${String(v).replace(/&/g,"&amp;").replace(/"/g, "&quot;")}" size="${Math.min(Math.max(String(v).length, 6), 40)}"></td>`;
+    }
+    h += "</tr>";
+  });
+  g.innerHTML = h + "</tbody>";
+}
+
+$("#grid").addEventListener("input", e => {
+  const inp = e.target.closest("input"); if (!inp) return;
+  const i = +inp.closest("tr").dataset.i, k = inp.dataset.k;
+  rows[i].record[k] = inp.value;
+  if (KEY.includes(k)) inp.parentElement.classList.toggle("missing", inp.value.trim() === "");
+  save();
+});
+$("#grid").addEventListener("click", e => {
+  const d = e.target.closest("[data-del]"), v = e.target.closest("[data-view]");
+  if (d) { rows.splice(+d.dataset.del, 1); save(); render(); }
+  if (v) showViewer(rows[+v.dataset.view]);
+});
+
+function showViewer(r) {
+  selected = r.id; render();
+  $("#viewerCard").style.display = "block"; $("#viewer").classList.add("on");
+  $("#viewerTitle").textContent = r.record.source_file || "Certificate";
+  $("#ocrText").textContent = r.markdown || "(no OCR text)";
+  const f = files[r.id], p = $("#preview");
+  if (!f) p.innerHTML = `<div class="empty">Original file preview is only available in the session it was uploaded.</div>`;
+  else if (f.type === "application/pdf") p.innerHTML = `<iframe src="${URL.createObjectURL(f)}"></iframe>`;
+  else p.innerHTML = `<img src="${URL.createObjectURL(f)}">`;
+  $("#viewerCard").scrollIntoView({ behavior: "smooth" });
+}
+$("#closeViewer").onclick = () => { $("#viewerCard").style.display = "none"; selected = null; render(); };
+
+// ── upload & extract ────────────────────────────────────────
+const drop = $("#drop");
+drop.onclick = () => $("#file").click();
+$("#file").onchange = e => { handle([...e.target.files]); e.target.value = ""; };
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => handle([...e.dataTransfer.files]));
+
+async function handle(list) {
+  const queue = list.map(f => { const chip = document.createElement("span"); chip.className = "chip"; chip.textContent = f.name; $("#queue").appendChild(chip); return { f, chip }; });
+  const workers = Array.from({ length: 3 }, async () => {
+    while (queue.length) {
+      const { f, chip } = queue.shift();
+      chip.className = "chip run";
+      const fd = new FormData(); fd.append("files", f);
+      try {
+        const res = await fetch("/api/extract", { method: "POST", body: fd });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const out = (await res.json()).results[0];
+        if (out.error) throw new Error(out.error);
+        const id = uid(); files[id] = f;
+        rows.push({ id, record: out.record, missing: out.missing, markdown: out.markdown });
+        save(); render();
+        chip.className = "chip done"; chip.textContent = `✓ ${f.name}` + (out.missing.length ? ` (${out.missing.length} to check)` : "");
+      } catch (err) {
+        chip.className = "chip fail"; chip.textContent = `✕ ${f.name}: ${err.message}`; chip.title = err.message;
+      }
+    }
+  });
+  await Promise.all(workers);
+}
+
+// ── export ──────────────────────────────────────────────────
+async function exportXlsx(template) {
+  if (!rows.length) return toast("Nothing to export yet.");
+  const fd = new FormData();
+  fd.append("records", JSON.stringify(rows.map(r => cast(r.record))));
+  if (template) fd.append("template", template);
+  const res = await fetch("/api/export", { method: "POST", body: fd });
+  if (!res.ok) return toast("Export failed: " + ((await res.json()).detail || res.status));
+  const blob = await res.blob();
+  const name = (res.headers.get("Content-Disposition").match(/filename="([^"]+)"/) || [])[1] || "certificates.xlsx";
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  const info = JSON.parse(res.headers.get("X-Export-Info") || "{}");
+  toast(info.mode === "appended" ? `Appended ${info.rows} rows to sheet "${info.sheet}"` + (info.added_columns.length ? ` (added columns: ${info.added_columns.join(", ")})` : "")
+                                 : `Exported ${info.rows} rows`);
+}
+const NUMERIC = ["carat", "length_mm", "width_mm", "depth_mm", "depth_pct", "table_pct", "crown_angle", "pavilion_angle"];
+function cast(rec) {   // keep numbers numeric in Excel after manual edits
+  const o = { ...rec };
+  for (const k of NUMERIC) if (o[k] !== null && o[k] !== "" && !isNaN(+o[k])) o[k] = +o[k];
+  return o;
+}
+$("#exportBtn").onclick = () => exportXlsx(null);
+$("#appendBtn").onclick = () => $("#tpl").click();
+$("#tpl").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) exportXlsx(f); };
+$("#addRow").onclick = () => { rows.push({ id: uid(), record: {}, missing: KEY, markdown: "" }); save(); render(); };
+$("#clear").onclick = () => { if (rows.length && confirm("Remove all rows?")) { rows = []; save(); render(); $("#queue").innerHTML = ""; } };
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+<PAGE><BLOCK>title<LEVEL1>[60,40,520,80]<FORK>GIA DIAMOND GRADING REPORT
+<BLOCK>text[60,90,520,110]<FORK>GEMOLOGICAL INSTITUTE OF AMERICA
+<BLOCK>text[60,130,480,320]<FORK>November 03, 2025
+GIA Report Number .......................... 2215487963
+Shape and Cutting Style ........... Round Brilliant
+Measurements ......... 6.45 - 6.48 x 3.98 mm
+<BLOCK>title<LEVEL2>[60,330,480,350]<FORK>GRADING RESULTS
+<BLOCK>text[60,360,480,450]<FORK>Carat Weight ........................... 1.01 carat
+Color Grade ..................................... G
+Clarity Grade ................................. VS1
+Cut Grade ............................ Excellent
+<BLOCK>title<LEVEL2>[60,460,480,480]<FORK>ADDITIONAL GRADING INFORMATION
+<BLOCK>text[60,490,480,600]<FORK>Polish ....................................... Excellent
+Symmetry ............................... Very Good
+Fluorescence ........................... Faint
+Inscription(s): GIA 2215487963
+Comments: Clouds are not shown.
+<BLOCK>table[560,130,940,420]<FORK><table><tr><td>Table</td><td>57%</td></tr><tr><td>Total Depth</td><td>61.6%</td></tr><tr><td>Crown Angle</td><td>34.5°</td></tr><tr><td>Pavilion Angle</td><td>40.8°</td></tr><tr><td>Girdle</td><td>Medium, Faceted, 3.5%</td></tr><tr><td>Culet</td><td>None</td></tr></table>
+<BLOCK>text[560,440,940,470]<FORK>Clarity Characteristics: Crystal, Cloud, Needle
+<BLOCK>text[560,800,940,830]<FORK>GIA COLOR SCALE D E F G H I J K L M N

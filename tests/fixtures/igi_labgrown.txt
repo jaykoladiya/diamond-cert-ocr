@@ -1,0 +1,4 @@
+<PAGE><BLOCK>title<LEVEL1>[40,30,600,70]<FORK>INTERNATIONAL GEMOLOGICAL INSTITUTE
+<BLOCK>text[40,80,600,100]<FORK>LABORATORY GROWN DIAMOND REPORT
+<BLOCK>table[40,120,600,560]<FORK><table><tr><td>REPORT NUMBER</td><td>LG 612345678</td></tr><tr><td>DATE</td><td>15/08/2025</td></tr><tr><td>DESCRIPTION</td><td>LABORATORY GROWN DIAMOND</td></tr><tr><td>SHAPE AND CUTTING STYLE</td><td>OVAL BRILLIANT</td></tr><tr><td>MEASUREMENTS</td><td>9.12 x 6.35 x 3.95 mm</td></tr><tr><td>CARAT WEIGHT</td><td>1.52 Carats</td></tr><tr><td>COLOR GRADE</td><td>E</td></tr><tr><td>CLARITY GRADE</td><td>VVS 2</td></tr><tr><td>POLISH</td><td>EXCELLENT</td></tr><tr><td>SYMMETRY</td><td>EXCELLENT</td></tr><tr><td>FLUORESCENCE</td><td>NONE</td></tr><tr><td>INSCRIPTION(S)</td><td>LG612345678</td></tr></table>
+<BLOCK>text[40,580,600,640]<FORK>COMMENTS: As Grown - No indication of post-growth treatment. This Laboratory Grown Diamond was created by Chemical Vapor Deposition (CVD) growth process.

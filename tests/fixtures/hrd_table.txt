@@ -1,0 +1,4 @@
+<PAGE><BLOCK>title<LEVEL1>[50,30,500,60]<FORK>HRD Antwerp Diamond Certificate
+<BLOCK>text[50,80,500,100]<FORK>Certificate No. 220001234567
+<BLOCK>text[50,105,500,120]<FORK>Date of issue: 2 February 2024
+<BLOCK>table[50,130,900,500]<FORK><table><tr><td>Shape</td><td>Princess</td><td>Carat</td><td>0,70 ct</td></tr><tr><td>Colour Grade</td><td>F</td><td>Clarity Grade</td><td>SI 1</td></tr><tr><td>Cut grade</td><td>Very good</td><td>Fluorescence</td><td>Medium Blue</td></tr><tr><td>Measurements</td><td>5.10 x 5.02 x 3.70 mm</td><td>Total depth</td><td>73.7 %</td></tr><tr><td>Table width</td><td>68 %</td><td>Culet</td><td>Pointed</td></tr></table>
