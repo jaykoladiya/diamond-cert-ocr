@@ -16,6 +16,10 @@ DET_MODEL = os.environ.get("PADDLE_DET_MODEL", "PP-OCRv5_server_det")  # most ac
 REC_MODEL = os.environ.get("PADDLE_REC_MODEL", "en_PP-OCRv5_mobile_rec")
 PDF_DPI = int(os.environ.get("PADDLE_PDF_DPI", "200"))
 REREAD_BELOW = float(os.environ.get("PADDLE_REREAD_BELOW", "0.85"))  # re-read values less sure than this
+# oneDNN (MKL-DNN) CPU acceleration. Off by default: PaddlePaddle 3.3 on Windows fails with
+# "ConvertPirAttribute2RuntimeAttribute not support ..." in onednn_instruction.cc when it is on.
+USE_MKLDNN = os.environ.get("PADDLE_MKLDNN", "0").lower() in ("1", "true", "yes")
+_mkldnn = USE_MKLDNN
 
 _lock = threading.Lock()
 _engine = None  # (ocr, recognizer)
@@ -34,11 +38,12 @@ def _load():
     if _engine is None:
         import paddleocr
         if hasattr(paddleocr, "TextRecognition"):  # PaddleOCR 3.x
+            common = {"device": "cpu", "enable_mkldnn": _mkldnn}
             ocr = paddleocr.PaddleOCR(
                 text_detection_model_name=DET_MODEL, text_recognition_model_name=REC_MODEL,
                 use_doc_orientation_classify=False, use_doc_unwarping=False,
-                use_textline_orientation=False)
-            rec = paddleocr.TextRecognition(model_name=REC_MODEL)
+                use_textline_orientation=False, **common)
+            rec = paddleocr.TextRecognition(model_name=REC_MODEL, **common)
             _engine = ("v3", ocr, rec)
         else:  # PaddleOCR 2.x
             ocr = paddleocr.PaddleOCR(lang="en", use_angle_cls=False, show_log=False)
@@ -294,18 +299,35 @@ def _decode(mime, data):
     return img
 
 
+def _is_onednn_error(e):
+    msg = str(e).lower()
+    return any(k in msg for k in ("onednn", "mkldnn", "convertpirattribute2runtimeattribute"))
+
+
 def run(pages):
     """pages: [(mime, bytes)] -> text (pages separated by blank lines)."""
-    texts = []
+    global _engine, _mkldnn
     with _lock:  # Paddle predictors are not thread-safe
-        for mime, data in pages:
-            img = deskew(_decode(mime, data))
-            lines = group_lines(_detect(img))
-            H, W = img.shape[:2]
+        try:
+            return _run(pages)
+        except Exception as e:  # noqa: BLE001
+            if not (_mkldnn and _is_onednn_error(e)):
+                raise
+            # this PaddlePaddle build cannot run these models with oneDNN: rebuild without it
+            _mkldnn, _engine = False, None
+            return _run(pages)
 
-            def crop(x1, y1, x2, y2):
-                return img[max(0, int(y1)):min(H, int(y2)), max(0, int(x1)):min(W, int(x2))]
 
-            fill_missing_values(lines, W, _recognize, crop)
-            texts.append(lines_to_text(lines))
+def _run(pages):
+    texts = []
+    for mime, data in pages:
+        img = deskew(_decode(mime, data))
+        lines = group_lines(_detect(img))
+        H, W = img.shape[:2]
+
+        def crop(x1, y1, x2, y2):
+            return img[max(0, int(y1)):min(H, int(y2)), max(0, int(x1)):min(W, int(x2))]
+
+        fill_missing_values(lines, W, _recognize, crop)
+        texts.append(lines_to_text(lines))
     return "\n\n".join(texts)

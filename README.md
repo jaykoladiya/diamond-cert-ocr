@@ -34,6 +34,15 @@ have no labels and are left blank for you to fill in.
 Model choice (env vars): `PADDLE_DET_MODEL` (default `PP-OCRv5_server_det`; `PP-OCRv5_mobile_det` is faster,
 but misses small text more often), `PADDLE_REC_MODEL` (default `en_PP-OCRv5_mobile_rec`), `PADDLE_PDF_DPI` (200).
 
+### Troubleshooting PaddleOCR
+- **`NotImplementedError: ... ConvertPirAttribute2RuntimeAttribute not support ... onednn_instruction.cc`**
+  is a PaddlePaddle 3.3 bug on Windows when oneDNN (MKL-DNN) acceleration is on. The portal now runs Paddle
+  with oneDNN off (`PADDLE_MKLDNN=0`, the default) and falls back automatically if it ever hits this error.
+  If you still see it, install the previous PaddlePaddle release:
+  `.venv\Scripts\python -m pip install paddlepaddle==3.2.2`.
+- **Slow on CPU** (several seconds per certificate): set `PADDLE_DET_MODEL=PP-OCRv5_mobile_det` before
+  `start.bat` (faster, slightly more likely to miss small text), or try `PADDLE_MKLDNN=1` on PaddlePaddle 3.2.x.
+
 ## Extracted columns
 Lab · Report Number · Report Date · Natural / Lab-Grown · Growth Method (CVD/HPHT) · Shape & Cutting Style ·
 Measurements · Length/Width/Depth (mm) · Carat · Color · Clarity · Cut · Polish · Symmetry · Fluorescence ·

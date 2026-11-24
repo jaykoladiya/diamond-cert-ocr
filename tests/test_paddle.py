@@ -76,3 +76,61 @@ def test_pipeline_end_to_end(tmp_path, rot, noise):
               "carat": 2.01, "color": "D", "clarity": "VVS1", "cut": "Excellent", "polish": "Excellent",
               "symmetry": "Excellent", "fluorescence": "None", "length_mm": 8.18, "depth_mm": 4.93}
     assert {k: r[k] for k in expect} == expect
+
+
+class _FakePaddle:
+    """Stand-in for the paddleocr module: records constructor options and can fail like
+    PaddlePaddle 3.3 on Windows does with oneDNN enabled."""
+    ERR = ("(Unimplemented) ConvertPirAttribute2RuntimeAttribute not support "
+           "[pir::ArrayAttribute<pir::DoubleAttribute>] (at ..\\paddle\\fluid\\framework\\new_executor"
+           "\\instruction\\onednn\\onednn_instruction.cc:118)")
+
+    def __init__(self):
+        self.made = []
+        outer = self
+
+        class PaddleOCR:
+            def __init__(self, **kw):
+                outer.made.append(kw)
+                self.kw = kw
+
+            def predict(self, img):
+                if self.kw.get("enable_mkldnn"):
+                    raise NotImplementedError(outer.ERR)
+                return [{"rec_boxes": [[10, 10, 120, 30], [300, 10, 330, 30]],
+                         "rec_texts": ["Color Grade", "G"], "rec_scores": [0.95, 0.95]}]
+
+        class TextRecognition:
+            def __init__(self, **kw):
+                self.kw = kw
+
+            def predict(self, input):
+                return [{"rec_text": "", "rec_score": 0.0}]
+
+        self.PaddleOCR, self.TextRecognition = PaddleOCR, TextRecognition
+
+
+def _png_page():
+    from PIL import Image
+    import io
+    b = io.BytesIO(); Image.new("RGB", (400, 60), "white").save(b, "PNG")
+    return [("image/png", b.getvalue())]
+
+
+def test_paddle_cpu_without_onednn_by_default(monkeypatch):
+    fake = _FakePaddle()
+    monkeypatch.setitem(sys.modules, "paddleocr", fake)
+    monkeypatch.setattr(P, "_engine", None)
+    monkeypatch.setattr(P, "_mkldnn", P.USE_MKLDNN)
+    assert "Color Grade | G" in P.run(_png_page())
+    assert fake.made[0]["enable_mkldnn"] is False and fake.made[0]["device"] == "cpu"
+
+
+def test_paddle_onednn_error_falls_back(monkeypatch):
+    fake = _FakePaddle()
+    monkeypatch.setitem(sys.modules, "paddleocr", fake)
+    monkeypatch.setattr(P, "_engine", None)
+    monkeypatch.setattr(P, "_mkldnn", True)          # as with PADDLE_MKLDNN=1
+    assert "Color Grade | G" in P.run(_png_page())   # first attempt hits the error, retry works
+    assert [m["enable_mkldnn"] for m in fake.made] == [True, False]
+    assert P._mkldnn is False
