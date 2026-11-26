@@ -53,12 +53,26 @@ but misses small text more often), `PADDLE_REC_MODEL` (default `en_PP-OCRv5_mobi
 - **Slow on CPU** (several seconds per certificate): set `PADDLE_DET_MODEL=PP-OCRv5_mobile_det` before
   `start.bat` (faster, slightly more likely to miss small text), or try `PADDLE_MKLDNN=1` on PaddlePaddle 3.2.x.
 
-## Extracted columns
-Lab · Report Number · Report Date · Natural / Lab-Grown · Growth Method (CVD/HPHT) · Shape & Cutting Style ·
-Measurements · Length/Width/Depth (mm) · Carat · Color · Clarity · Cut · Polish · Symmetry · Fluorescence ·
-Depth % · Table % · Crown Angle · Pavilion Angle · Girdle · Culet · Inscription · Comments · Source File
+## Excel layout
+The first columns follow the stock-list format, with short codes:
 
-Key fields (report no., shape, carat, color, clarity) that could not be found are highlighted yellow.
+| Shape | Ct. | Clr | Clrty | C | P | SYM | FLT | Lab | Cert |
+|---|---|---|---|---|---|---|---|---|---|
+| Round | 0.45 | F | IF | EX | EX | EX | NON | GIA | 1495557172 |
+
+- Shape: trade name from the report's "shape and cutting style" (Round Brilliant → Round,
+  Square Modified Brilliant → Princess, Cut-Cornered ... Modified Brilliant → Radiant, ...).
+- C / P / SYM: ID, EX, VG, G, F, P. FLT: NON, FNT, MED, STG, VST (fluorescence colour is dropped).
+- Ct. is a number shown with two decimals.
+
+After those come the remaining fields: Report Date · Natural / Lab-Grown · Growth Method (CVD/HPHT) ·
+Measurements · Length/Width/Depth (mm) · Depth % · Table % · Crown Angle · Pavilion Angle · Girdle · Culet ·
+Inscription · Comments · Source File. The on-screen table uses the same layout and codes.
+
+"Append to my Excel…" writes under the matching headers of your own sheet, including these short headers
+(Ct., Clr, Clrty, C, P, SYM, FLT, Cert), and adds any missing columns at the right.
+
+Key fields (Cert, Shape, Ct., Clr, Clrty) that could not be found are highlighted yellow.
 Click 👁 on a row to see the original certificate next to the OCR text and correct anything before exporting.
 
 ## Optional: Unlimited-OCR-2 on a GPU server

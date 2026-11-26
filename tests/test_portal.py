@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from openpyxl import Workbook, load_workbook
 
 from app import ocr
-from app.excel import build_workbook
+from app.excel import build_workbook, format_record
 from app.extract import extract_fields
 from app.main import app
 
@@ -58,7 +58,13 @@ def test_excel_new_and_append():
     recs = [dict(fields("gia_natural.txt"), source_file="a.pdf")]
     data, info = build_workbook(recs)
     ws = load_workbook(io.BytesIO(data)).active
-    assert info["mode"] == "new" and ws["B2"].value == "2215487963" and ws.cell(1, 1).value == "Lab"
+    assert info["mode"] == "new"
+    # stock-list layout: these ten columns first, short codes, then the rest
+    assert [c.value for c in ws[1]][:10] == ["Shape", "Ct.", "Clr", "Clrty", "C", "P", "SYM", "FLT", "Lab", "Cert"]
+    assert [c.value for c in ws[2]][:10] == ["Round", 1.01, "G", "VS1", "EX", "EX", "VG", "FNT", "GIA", "2215487963"]
+    assert ws["B2"].number_format == "0.00"
+    headers = [c.value for c in ws[1]]
+    assert headers[10:13] == ["Report Date", "Natural / Lab-Grown", "Growth Method"] and headers[-1] == "Source File"
 
     wb = Workbook(); s = wb.active
     s.append(["My Stock List"]); s.append([])
@@ -99,7 +105,8 @@ def test_api_extract_and_export(client):
     resp = client.post("/api/export", data={"records": json.dumps([ok["record"]])})
     assert resp.status_code == 200
     ws = load_workbook(io.BytesIO(resp.content)).active
-    assert ws["B2"].value == "LG612345678"
+    assert [c.value for c in ws[2]][:10] == ["Oval", 1.52, "E", "VVS2", None, "EX", "EX", "NON", "IGI", "LG612345678"]
+    assert ok["record"]["shape"] == "Oval" and ok["record"]["fluorescence"] == "NON"  # on screen as in Excel
 
 
 def test_pdf_pages():
@@ -107,3 +114,34 @@ def test_pdf_pages():
     doc = fitz.open(); doc.new_page(); doc.new_page()
     pages = ocr.to_page_images("x.pdf", doc.tobytes())
     assert len(pages) == 2 and pages[0][0] == "image/png"
+
+
+@pytest.mark.parametrize("shape,code", [
+    ("Round Brilliant", "Round"), ("Cushion Modified Brilliant", "Cushion"), ("Oval Brilliant", "Oval"),
+    ("Square Modified Brilliant", "Princess"), ("Cut-Cornered Rectangular Modified Brilliant", "Radiant"),
+    ("Emerald Cut", "Emerald"), ("Square Emerald Cut", "Square Emerald"), ("Pear Modified Brilliant", "Pear"),
+    ("Round", "Round"), ("Some New Cut", "Some New Cut")])
+def test_shape_codes(shape, code):
+    assert format_record({"shape": shape})["shape"] == code
+
+
+def test_grade_and_fluorescence_codes():
+    r = format_record({"cut": "Very Good", "polish": "Excellent", "symmetry": "Good",
+                       "fluorescence": "Medium Blue", "carat": "0.45"})
+    assert (r["cut"], r["polish"], r["symmetry"], r["fluorescence"], r["carat"]) == ("VG", "EX", "G", "MED", 0.45)
+    assert format_record(r) == r                     # already-short values stay as they are
+    assert format_record({"fluorescence": "Very Strong"})["fluorescence"] == "VST"
+    assert format_record({"fluorescence": "None"})["fluorescence"] == "NON"
+
+
+def test_append_to_short_header_stock_list():
+    """A sheet laid out like the stock list (Shape | Ct. | Clr | ...) gets rows under its own headers."""
+    wb = Workbook(); s = wb.active
+    s.append(["Shape", "Ct.", "Clr", "Clrty", "C", "P", "SYM", "FLT", "Lab", "Cert"])
+    s.append(["Round", 0.45, "F", "IF", "EX", "EX", "EX", "NON", "GIA", "1495557172"])
+    buf = io.BytesIO(); wb.save(buf)
+    data, info = build_workbook([dict(fields("gia_natural.txt"), source_file="a.pdf")], buf.getvalue())
+    ws = load_workbook(io.BytesIO(data)).active
+    assert [c.value for c in ws[3]][:10] == ["Round", 1.01, "G", "VS1", "EX", "EX", "VG", "FNT", "GIA", "2215487963"]
+    assert [c.value for c in ws[2]][:2] == ["Round", 0.45]      # existing row untouched
+    assert "Report Date" in info["added_columns"]               # the rest are added after

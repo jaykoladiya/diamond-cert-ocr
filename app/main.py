@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from . import ocr
-from .excel import COLUMNS, build_workbook
+from .excel import COLUMNS, build_workbook, format_record
 from .extract import KEY_FIELDS, extract_fields, missing_key_fields
 
 STATIC = Path(__file__).parent / "static"
@@ -52,6 +52,7 @@ async def _process(upload: UploadFile, engine: str | None = None):
             return {"source_file": name, "error": f"{type(e).__name__}: {e}"}
     record = dict(extract_fields(markdown))
     record["source_file"] = name
+    record = format_record(record)  # same codes and layout as the Excel export
     return {"source_file": name, "record": record, "missing": missing_key_fields(record),
             "markdown": markdown}
 
