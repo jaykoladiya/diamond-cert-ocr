@@ -1,6 +1,7 @@
 """OCR backends: an Unlimited-OCR-2 server (SGLang, GPU) or local PaddleOCR (CPU).
 
-OCR_BACKEND=auto (default) uses the Unlimited-OCR-2 server when it answers, else PaddleOCR.
+OCR_BACKEND=auto (default) uses the Unlimited-OCR-2 server when it answers, else the
+OCR built into Windows (as in PowerToys Text Extractor), else PaddleOCR.
 
 For Unlimited-OCR-2: turns an uploaded certificate (PDF or image) into page images, sends them to the
 server in one request (as in the upstream README), and converts the raw layout
@@ -14,10 +15,12 @@ import time
 
 import requests
 
-from . import ocr_paddle
+from . import ocr_paddle, ocr_windows
 from .vendor.process_unlimitedOCR2 import convert
 
-OCR_BACKEND = os.environ.get("OCR_BACKEND", "auto").lower()  # auto | unlimited | paddle
+OCR_BACKEND = os.environ.get("OCR_BACKEND", "auto").lower()  # auto | unlimited | windows | paddle
+ENGINE_LABELS = {"unlimited": "Unlimited-OCR-2 (GPU server)", "windows": "Windows OCR (built in)",
+                 "paddle": "PaddleOCR (local CPU)"}
 
 OCR_URL = os.environ.get("OCR_URL", "http://127.0.0.1:10000").rstrip("/")
 OCR_MODEL = os.environ.get("OCR_MODEL", "Unlimited-OCR-2")
@@ -93,19 +96,26 @@ def build_payload(pages, crop_mode=True):
     return payload
 
 
-def run_ocr(filename, data):
-    """OCR one uploaded file with the active backend. Returns (raw_output, text)."""
-    backend = active_backend()
-    if backend == "paddle":
+def run_ocr(filename, data, engine=None):
+    """OCR one uploaded file. `engine` picks one explicitly ("unlimited", "windows",
+    "paddle"); otherwise the active backend is used. Returns (raw_output, text)."""
+    backend = engine if engine and engine != "auto" else active_backend()
+    if backend in ("windows", "paddle"):
+        mod = ocr_windows if backend == "windows" else ocr_paddle
+        if not mod.available():
+            raise OCRError(f"{ENGINE_LABELS[backend]} is not available"
+                           + (f": {ocr_windows.unavailable_reason()}" if backend == "windows" else ""))
         pages = to_page_images(filename, data, dpi=ocr_paddle.PDF_DPI)
         if not pages:
             raise OCRError("No pages found in file")
-        text = ocr_paddle.run(pages)
+        text = mod.run(pages)
         return text, text
+    if backend == "unlimited":
+        return run_unlimited(filename, data)
     if backend is None:
-        raise OCRError(f"No OCR engine available: the Unlimited-OCR server at {OCR_URL} is offline "
-                       "and PaddleOCR is not installed (pip install paddlepaddle paddleocr)")
-    return run_unlimited(filename, data)
+        raise OCRError("No OCR engine available: the Unlimited-OCR server at " + OCR_URL + " is offline, "
+                       "Windows OCR is unavailable and PaddleOCR is not installed")
+    raise OCRError(f"Unknown OCR engine: {backend}")
 
 
 def run_unlimited(filename, data):
@@ -141,18 +151,29 @@ def unlimited_online(max_age=30):
     return _probe["ok"]
 
 
+def engine_available(name):
+    if name == "unlimited":
+        return unlimited_online()
+    if name == "windows":
+        return ocr_windows.available()
+    if name == "paddle":
+        return ocr_paddle.available()
+    return False
+
+
 def active_backend():
-    if OCR_BACKEND == "paddle":
-        return "paddle" if ocr_paddle.available() else None
-    if OCR_BACKEND == "unlimited":
-        return "unlimited"
-    if unlimited_online():
-        return "unlimited"
-    return "paddle" if ocr_paddle.available() else None
+    if OCR_BACKEND in ENGINE_LABELS:
+        return OCR_BACKEND if OCR_BACKEND == "unlimited" or engine_available(OCR_BACKEND) else None
+    for name in ("unlimited", "windows", "paddle"):
+        if engine_available(name):
+            return name
+    return None
 
 
 def server_status():
     backend = active_backend()
-    label = {"unlimited": f"Unlimited-OCR-2 ({OCR_URL})", "paddle": "PaddleOCR (local CPU)"}
-    return {"ok": backend is not None, "backend": backend,
-            "label": label.get(backend, f"No OCR engine (server {OCR_URL} offline, PaddleOCR not installed)")}
+    engines = [{"key": k, "label": v, "available": engine_available(k)} for k, v in ENGINE_LABELS.items()]
+    label = ENGINE_LABELS.get(backend, "No OCR engine available")
+    if backend == "unlimited":
+        label += f" at {OCR_URL}"
+    return {"ok": backend is not None, "backend": backend, "label": label, "engines": engines}

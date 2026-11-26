@@ -38,14 +38,14 @@ def columns():
     return {"columns": [{"key": k, "header": h} for k, h in COLUMNS], "key_fields": KEY_FIELDS}
 
 
-async def _process(upload: UploadFile):
+async def _process(upload: UploadFile, engine: str | None = None):
     name = upload.filename or "upload"
     data = await upload.read()
     if len(data) > MAX_FILE_MB * 1024 * 1024:
         return {"source_file": name, "error": f"File larger than {MAX_FILE_MB} MB"}
     async with _sem:
         try:
-            raw, markdown = await run_in_threadpool(ocr.run_ocr, name, data)
+            raw, markdown = await run_in_threadpool(ocr.run_ocr, name, data, engine)
         except ocr.OCRError as e:
             return {"source_file": name, "error": str(e)}
         except Exception as e:  # noqa: BLE001 - surface anything else per file
@@ -57,10 +57,12 @@ async def _process(upload: UploadFile):
 
 
 @app.post("/api/extract")
-async def extract(files: list[UploadFile] = File(...)):
+async def extract(files: list[UploadFile] = File(...), engine: str = Form("auto")):
     if not files:
         raise HTTPException(400, "No files uploaded")
-    return {"results": await asyncio.gather(*(_process(f) for f in files))}
+    if engine not in ("auto", *ocr.ENGINE_LABELS):
+        raise HTTPException(400, f"Unknown engine: {engine}")
+    return {"results": await asyncio.gather(*(_process(f, engine) for f in files))}
 
 
 @app.post("/api/export")

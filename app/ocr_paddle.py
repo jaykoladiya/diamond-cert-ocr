@@ -189,13 +189,21 @@ def _level_strip(crop, lab, right, slope, h):
     return big[top:int(lab[3] - y0 + h * 0.15)]
 
 
-def _strip_label(text):
-    """'Color Grade. H' -> 'H' using the field label patterns."""
+def _strip_label(text, label_text=""):
+    """'Color Grade. H' -> 'H' using the field label patterns. If the label itself was misread
+    ('Coore D'), drop as many leading words as the label has."""
     for rx in _LABEL_RES.values():
         m = rx.match(text)
         if m:
             return m.group(1)
-    return ""
+    n = len(re.findall(r"[A-Za-z]+", re.sub(r"\(s\)", "", label_text)))
+    words = [w for w in re.split(r"\s+|(?<!\d)[.:·]+|[.:·]+(?!\d)", text) if w]  # "Coor.D", not "2.01"
+    return " ".join(words[n:]) if n and len(words) > n else ""
+
+
+def _tidy(value):
+    value = re.sub(r"[^\x20-\x7E°±×–]", "", value)  # drop stray non-Latin glyphs
+    return re.sub(r"^[\s.·:_\-–,]+|[\s.·:_\-–,]+$", "", value)
 
 
 def fill_missing_values(lines, img_w, recognize, crop):
@@ -233,8 +241,10 @@ def fill_missing_values(lines, img_w, recognize, crop):
         hh = min(label_img.shape[0], value_img.shape[0])
         gap = np.full((hh, max(4, int(h * 0.5))) + label_img.shape[2:], 255, dtype=label_img.dtype)
         text, score = recognize(np.hstack([label_img[:hh], gap, value_img[:hh]]))
-        value = re.sub(r"[^\x20-\x7E°±×–]", "", _strip_label(text or ""))  # drop stray non-Latin glyphs
-        value = re.sub(r"^[\s.·:_\-–,]+|[\s.·:_\-–,]+$", "", value)
+        value = _tidy(_strip_label(text or "", lab[4]))
+        if not value:  # engine found the label but not the value beside it: read the value alone
+            text, score = recognize(value_img)
+            value = _tidy(text or "")
         if not value or score < 0.6:
             continue
         if not ln[1:] or (_value_ok(key, value) and (not old_ok or score > old_score)):
@@ -319,15 +329,22 @@ def run(pages):
 
 
 def _run(pages):
+    return process_pages(pages, _detect, _recognize)
+
+
+def process_pages(pages, detect, recognize):
+    """Engine-independent page pipeline: decode, deskew, detect boxes, build lines,
+    re-read doubtful values. `detect(img)` -> [(x1, y1, x2, y2, text, score)];
+    `recognize(img)` -> (text, score). Used by the PaddleOCR and Windows OCR engines."""
     texts = []
     for mime, data in pages:
         img = deskew(_decode(mime, data))
-        lines = group_lines(_detect(img))
+        lines = group_lines(detect(img))
         H, W = img.shape[:2]
 
         def crop(x1, y1, x2, y2):
             return img[max(0, int(y1)):min(H, int(y2)), max(0, int(x1)):min(W, int(x2))]
 
-        fill_missing_values(lines, W, _recognize, crop)
+        fill_missing_values(lines, W, recognize, crop)
         texts.append(lines_to_text(lines))
     return "\n\n".join(texts)

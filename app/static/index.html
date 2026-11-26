@@ -12,6 +12,7 @@
   header { background:var(--brand); color:#fff; padding:14px 24px; display:flex; align-items:center; gap:16px; }
   header h1 { font-size:18px; margin:0; font-weight:600; letter-spacing:.2px; }
   header .status { margin-left:auto; font-size:12.5px; display:flex; align-items:center; gap:8px; opacity:.95; }
+  header select { font:inherit; font-size:12.5px; border-radius:6px; border:1px solid #4a6585; background:#28496f; color:#fff; padding:3px 6px; }
   .dot { width:9px; height:9px; border-radius:50%; background:#999; display:inline-block; }
   .dot.ok { background:#4cd685; } .dot.bad { background:#ff6b6b; }
   main { padding:20px 24px; max-width:1600px; margin:0 auto; }
@@ -54,8 +55,12 @@
 <body>
 <header>
   <h1>💎 Diamond Certificate Portal</h1>
-  <span class="muted" style="color:#c9d6e6">GIA · IGI · HRD · AGS · GCAL — Unlimited-OCR-2 or PaddleOCR</span>
-  <div class="status"><span id="dot" class="dot"></span><span id="statusText">Checking OCR engine…</span></div>
+  <span class="muted" style="color:#c9d6e6">GIA · IGI · HRD · AGS · GCAL — Windows OCR, PaddleOCR or Unlimited-OCR-2</span>
+  <div class="status">
+    <label for="engine" style="opacity:.85">Engine</label>
+    <select id="engine" title="Which OCR engine reads the certificates"><option value="auto">Automatic</option></select>
+    <span id="dot" class="dot"></span><span id="statusText">Checking OCR engine…</span>
+  </div>
 </header>
 <main>
   <section class="card">
@@ -107,8 +112,14 @@ async function init() {
 async function checkStatus() {
   try {
     const s = await (await fetch("/api/status")).json();
-    $("#dot").className = "dot " + (s.ok ? "ok" : "bad");
-    $("#statusText").textContent = s.ok ? `OCR engine: ${s.label}` : s.label;
+    const sel = $("#engine"), chosen = localStorage.getItem("engine") || "auto";
+    const opts = `<option value="auto">Automatic</option>` + s.engines.map(e =>
+      `<option value="${e.key}" ${e.available ? "" : "disabled"}>${e.label}${e.available ? "" : " (unavailable)"}</option>`).join("");
+    if (sel.dataset.opts !== opts) { sel.innerHTML = opts; sel.dataset.opts = opts; }  // don't close an open menu
+    sel.value = [...sel.options].some(o => o.value === chosen && !o.disabled) ? chosen : "auto";
+    const pick = sel.value === "auto" ? s : { ok: true, label: s.engines.find(e => e.key === sel.value).label };
+    $("#statusText").textContent = pick.ok ? (sel.value === "auto" ? `Using ${pick.label}` : "") : pick.label;
+    $("#dot").className = "dot " + (pick.ok ? "ok" : "bad");
   } catch { $("#dot").className = "dot bad"; $("#statusText").textContent = "Portal unreachable"; }
 }
 
@@ -153,6 +164,7 @@ function showViewer(r) {
   else p.innerHTML = `<img src="${URL.createObjectURL(f)}">`;
   $("#viewerCard").scrollIntoView({ behavior: "smooth" });
 }
+$("#engine").onchange = e => { localStorage.setItem("engine", e.target.value); checkStatus(); };
 $("#closeViewer").onclick = () => { $("#viewerCard").style.display = "none"; selected = null; render(); };
 
 // ── upload & extract ────────────────────────────────────────
@@ -169,7 +181,7 @@ async function handle(list) {
     while (queue.length) {
       const { f, chip } = queue.shift();
       chip.className = "chip run";
-      const fd = new FormData(); fd.append("files", f);
+      const fd = new FormData(); fd.append("files", f); fd.append("engine", $("#engine").value);
       try {
         const res = await fetch("/api/extract", { method: "POST", body: fd });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

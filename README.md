@@ -4,28 +4,38 @@ Upload diamond grading certificates (GIA, IGI, HRD, AGS, GCAL, ...) as PDFs, sca
 The portal reads them with OCR, pulls out the grading fields, shows them in an editable table, and
 exports to Excel: either a new workbook, or rows appended to **your own** `.xlsx` (matched by column header).
 
-Two OCR engines:
+Three OCR engines. Pick one in the **Engine** menu at the top of the page, or leave it on
+**Automatic**, which uses the first available in this order:
 
-| Engine | Runs on | When it is used |
+| Engine | Runs on | Notes |
 |---|---|---|
-| **PaddleOCR** (default) | any PC, CPU only | when no Unlimited-OCR server is reachable |
-| [Unlimited-OCR-2](https://github.com/baidu/Unlimited-OCR) | NVIDIA GPU with ~16-24 GB+ VRAM, via SGLang | automatically, when its server at `OCR_URL` answers |
+| [Unlimited-OCR-2](https://github.com/baidu/Unlimited-OCR) | NVIDIA GPU with ~16-24 GB+ VRAM, via SGLang | used when its server at `OCR_URL` answers |
+| **Windows OCR** | Windows 10/11, built in | the engine behind PowerToys Text Extractor (`Windows.Media.Ocr`); instant, no download |
+| **PaddleOCR** | any PC, CPU only | downloads ~100 MB of models on first use; reports confidence, so doubtful values get re-read |
 
-The header of the page shows which engine is active. Set `OCR_BACKEND=paddle` or `OCR_BACKEND=unlimited` to force one.
+`OCR_BACKEND=unlimited|windows|paddle` sets the default instead of Automatic.
 
-## Quick start on Windows (PaddleOCR, no GPU needed)
-1. Install 64-bit Python 3.9-3.13 from python.org (tick "Add python.exe to PATH").
-2. Double-click `start.bat`. The first run installs packages into `.venv`; the first certificate
-   downloads the OCR models (about 100 MB, once). The browser opens at http://localhost:8000.
+## Quick start on Windows (no GPU needed)
+1. Install 64-bit Python 3.10-3.13 from python.org (tick "Add python.exe to PATH").
+   (3.9 works with PaddleOCR only; Windows OCR needs 3.10+.)
+2. Double-click `start.bat`. It installs packages into `.venv` on the first run and again whenever
+   `requirements.txt` changes. The browser opens at http://localhost:8000.
+3. The header should show "Using Windows OCR (built in)". If Windows OCR shows as unavailable, add the
+   English OCR component: Settings > Time & language > Language & region > English > Language options >
+   Optical character recognition, or in an admin PowerShell:
+   `Add-WindowsCapability -Online -Name "Language.OCR~~~en-US~0.0.1.0"`.
 
 Linux / macOS: `pip install -r requirements.txt && ./run.sh`.
 
-### How the PaddleOCR path reads a certificate
-1. Each page is straightened (photos are often tilted a few degrees).
-2. PaddleOCR finds text boxes; boxes are chained into lines, so `Label ....... Value` pairs and two-column
+### How the Windows OCR and PaddleOCR engines read a certificate
+1. Each page is straightened (photos are often tilted a few degrees). Windows OCR also gets the page
+   upscaled, as PowerToys does, because small print reads better larger.
+2. The engine finds words/text boxes; they are chained into lines, so `Label ....... Value` pairs and two-column
    layouts (grading results | proportions) stay together.
 3. A label with a missing or implausible value (a lone colour letter "D", clarity read as ".S1") is read a
-   second time: leader dots are erased and the label is shown next to its value for context.
+   second time: leader dots are erased and the label is shown next to its value for context (then the value
+   alone, if that still fails). PaddleOCR also re-reads values it is unsure of; Windows OCR reports no
+   confidence, so with it only missing or invalid values are re-read.
 4. Common OCR slips are repaired (`S12`→`SI2`, `WS1`→`VVS1`, `GlA`→`GIA`, `Excelent`→`Excellent`).
 
 Values printed only inside the GIA proportions diagram (table %, depth %, angles on dossier-style reports)
@@ -88,11 +98,13 @@ python -m pytest -q tests
 ```
 `tests/test_paddle.py::test_pipeline_end_to_end` runs the whole PaddleOCR path on generated photos when
 `rapidocr_onnxruntime` is installed (same PP-OCR models packaged with pip; it is only a test aid).
-`tests/mock_ocr_server.py` imitates an Unlimited-OCR-2 server for testing that path without a GPU.
+`tests/mock_ocr_server.py` imitates an Unlimited-OCR-2 server for testing that path without a GPU, and
+`tests/fake_winrt.py` imitates PyWinRT so the Windows OCR engine is tested off Windows.
 
 ## Files
 - `app/ocr.py`: engine selection; PDF/image → pages → Unlimited-OCR-2 request → Markdown
-- `app/ocr_paddle.py`: PaddleOCR engine: deskew, line building, second-pass re-reads
+- `app/ocr_paddle.py`: PaddleOCR engine, plus the shared page pipeline (deskew, line building, re-reads)
+- `app/ocr_windows.py`: Windows OCR engine (`Windows.Media.Ocr` through PyWinRT)
 - `app/extract.py`: label/value field extraction and normalisation (add label spellings in `LABELS`)
 - `app/excel.py`: new workbook / append to existing sheet (header aliases in `ALIASES`)
 - `app/static/index.html`: the portal UI
