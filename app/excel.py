@@ -39,7 +39,7 @@ def _code(value, codes):
     if v.upper() in set(codes.values()):
         return v.upper()
     for word in sorted(codes, key=len, reverse=True):  # "very good" before "good"
-        if v.startswith(word):
+        if v.startswith(word) or v.replace(" ", "").startswith(word.replace(" ", "")):  # "VERYGOOD"
             return codes[word]
     return value
 

@@ -129,6 +129,92 @@ def _bare_label_key(text):
     return None
 
 
+def column_right_edge(lines, first):
+    """Where the values of a label column end. Certificates put a diagram or a second panel
+    beside the grading table; values never reach it. Taken from the first value box of the
+    lines starting at the same left margin, ignoring far-right outliers (a label whose own
+    value is missing gets chained to the next panel, e.g. "Color Grade | none")."""
+    h = max(1.0, first[3] - first[1])
+    ends = []
+    for o in lines:
+        if not o or abs(o[0][0] - first[0]) >= 2 * h or _label_at_start(o[0][4]) is None:
+            continue
+        if not _is_bare_label(o[0][4]):
+            ends.append(o[0][2])   # label and value read as one box: "Color Grade ...... E"
+        elif len(o) >= 2:
+            ends.append(o[1][2])   # "Color Grade" | "E"
+    ends.sort()
+    if len(ends) < 3:
+        return None
+    med = ends[len(ends) // 2]
+    return max(e for e in ends if e <= med + 4 * h)
+
+
+def _label_at_start(text):
+    for key, rx in _LABEL_RES.items():
+        if rx.match(text):
+            return key
+    return None
+
+
+def merge_words(lines):
+    """Join boxes in a line that are only a word space apart into one phrase box. Windows OCR
+    reports single words ("Color", "Grade"); PaddleOCR mostly reports phrases already."""
+    out = []
+    for ln in lines:
+        merged = [ln[0]]
+        for b in ln[1:]:
+            p = merged[-1]
+            h = min(p[3] - p[1], b[3] - b[1])
+            if b[0] - p[2] < 0.8 * h:
+                merged[-1] = (p[0], min(p[1], b[1]), b[2], max(p[3], b[3]), f"{p[4]} {b[4]}", min(p[5], b[5]))
+            else:
+                merged.append(b)
+        out.append(merged)
+    return out
+
+
+def split_panels(lines):
+    """Cut each line where it crosses into the next panel: boxes starting beyond the label
+    column's right edge become a line of their own. Then put a label that was left alone back
+    together with a value just right of it that sits a few pixels lower (it was chained elsewhere)."""
+    out = []
+    for ln in lines:
+        edge = column_right_edge(lines, ln[0])
+        h = ln[0][3] - ln[0][1]
+        cut = next((i for i, b in enumerate(ln) if i > 0 and edge is not None and b[0] > edge + h), None)
+        out.extend([ln[:cut], ln[cut:]] if cut else [ln])
+    for ln in out:
+        if len(ln) != 1 or not _is_bare_label(ln[0][4]):
+            continue
+        lab = ln[0]
+        h = lab[3] - lab[1]
+        edge = column_right_edge(out, lab)
+        cands = [o for o in out if o and o is not ln and not _is_bare_label(o[0][4])
+                 and lab[2] - 5 <= o[0][0] < lab[2] + 12 * h and (edge is None or o[0][0] < edge)
+                 and _v_overlap(lab, o[0]) >= 0.3]
+        if cands:
+            best = max(cands, key=lambda o: _v_overlap(lab, o[0]))
+            ln.extend(best)
+            best.clear()
+    # a label that ends its line with the value printed underneath ("Laserscribe on Girdle:"
+    # / "IGI X1Y23456"): join the line directly below that starts under the label
+    for ln in out:
+        if not ln or len(ln) < 2 or not _is_bare_label(ln[-1][4]):
+            continue
+        lab = ln[-1]
+        h = lab[3] - lab[1]
+        below = [o for o in out if o and o is not ln and abs(o[0][0] - lab[0]) < 2 * h
+                 and -0.3 * h <= o[0][1] - lab[3] <= 1.2 * h and _label_at_start(o[0][4]) is None]
+        if below:
+            nxt = min(below, key=lambda o: o[0][1])
+            ln.extend(nxt)
+            nxt.clear()
+    out = [ln for ln in out if ln]
+    out.sort(key=lambda ln: (min(b[1] for b in ln), ln[0][0]))
+    return out
+
+
 def _is_bare_label(text):
     return _bare_label_key(text) is not None
 
@@ -228,9 +314,11 @@ def fill_missing_values(lines, img_w, recognize, crop):
             continue
         lab = ln[0]
         h = lab[3] - lab[1]
-        # right edge of this column: furthest-reaching line that starts at the same left margin
-        col = [max(b[2] for b in other) for other in lines if abs(other[0][0] - lab[0]) < 2 * h]
-        right = min(img_w, max(col) + h) if col else img_w
+        edge = column_right_edge(lines, lab)
+        if edge is None:  # no clear column: furthest-reaching line from the same left margin
+            col = [max(b[2] for b in other) for other in lines if abs(other[0][0] - lab[0]) < 2 * h]
+            edge = max(col) if col else img_w
+        right = min(img_w, edge + h)
         if right - lab[2] < h:
             continue
         y1, y2 = lab[1] - h * 0.15, lab[3] + h * 0.15
@@ -339,7 +427,7 @@ def process_pages(pages, detect, recognize):
     texts = []
     for mime, data in pages:
         img = deskew(_decode(mime, data))
-        lines = group_lines(detect(img))
+        lines = split_panels(merge_words(group_lines(detect(img))))
         H, W = img.shape[:2]
 
         def crop(x1, y1, x2, y2):

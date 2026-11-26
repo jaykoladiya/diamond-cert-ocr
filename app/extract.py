@@ -44,15 +44,17 @@ KEY_FIELDS = ["report_number", "shape", "carat", "color", "clarity"]
 
 GRADE = r"(?:excellent|very\s*good|good|fair|poor|ideal|ex|vg|gd)"
 CLARITY = r"(?:FL|IF|VVS\s*[12]|VS\s*[12]|SI\s*[123]|I\s*[123]|P\s*[123])"
-FLUOR = r"(?:none|nil|negligible|inert|faint|slight|medium|moderate|strong|very\s*strong)"
+FLUOR = r"(?:none|nil|negligible|inert|faint|slight|medium|moderate|very\s*strong|strong)"
 
 # key -> (label regex, value validator regex or None)
 LABELS = OrderedDict([
-    ("report_number", (r"(?:(?:gia|igi|hrd|ags|gcal)\s*)?(?:grading\s*)?(?:report|certificate|cert\.?|dossier)\s*(?:number|no\.?|num\.?|#)",
-                       r"[A-Z]{0,3}\s*\d[\d\s-]{5,}")),
+    ("report_number", (r"(?:(?:gia|igi|hrd|ags|gcal)\s*)?(?:grading\s*)?(?:(?:report|certificate|cert\.?|dossier)\s*)?(?:number|no\.?|num\.?|#)",
+                       r"(?=(?:\D*\d){5})[A-Z]{0,3}\s*[A-Z0-9][A-Z0-9\s-]{5,}")),
     ("report_date", (r"(?:report\s*)?date(?:\s*of\s*issue)?|issue\s*date|issued\s*on", r".*\d.*")),
     ("description", (r"description|diamond\s*type|nature|origin", None)),
-    ("shape", (r"shape\s*(?:and|&)\s*cut(?:ting)?\s*style|shape\s*(?:and|&|/)\s*cut|shape|cutting\s*style", r"[A-Za-z].*")),
+    ("shape", (r"shape\s*(?:and|&)\s*cut(?:ting)?\s*style|shape\s*(?:and|&|/)\s*cut|shape|cutting\s*style",
+               r"(?=.*(?:round|oval|princess|cushion|emerald|pear|marquise|heart|radiant|asscher|square|rectangular"
+               r"|triang|trilliant|baguette|european|mine|rose|brilliant|modified|step|cut))[A-Za-z].*")),
     ("measurements", (r"measurements?|dimensions?", r".*\d.*")),
     ("carat", (r"carat\s*weight|weight|carats?", r"\d{1,3}\s*[.,]\s*\d{1,3}.*")),
     ("color", (r"colou?r\s*grade|colou?r(?!\s*(?:scale|origin|distribution))",
@@ -68,7 +70,7 @@ LABELS = OrderedDict([
     ("pavilion_angle", (r"pavilion\s*angle", r"\d{2}(?:[.,]\d+)?\s*°?.*")),
     ("girdle", (r"girdle(?:\s*thickness)?", r"[A-Za-z].*")),
     ("culet", (r"culet(?:\s*size)?", r"[A-Za-z].*")),
-    ("inscription", (r"(?:laser\s*)?inscriptions?(?:\s*\(s\))?|inscription\(s\)", r".+")),
+    ("inscription", (r"(?:laser\s*)?inscriptions?(?:\s*\(s\))?|inscription\(s\)|laser\s*scr[il]?be(?:\s*on\s*girdle)?", r".+")),
     ("comments", (r"comments?|remarks?|additional\s*comments?", r".+")),
 ])
 _LABEL_RES = {k: re.compile(r"^\s*(?:" + lab + r")\s*(?:\(s\))?\s*[:：|\-–]?\s*(.*)$", re.I)
@@ -179,20 +181,20 @@ def _title(s):
 
 def _grade(s):
     s = s.strip()
-    abbrev = {"ex": "Excellent", "vg": "Very Good", "gd": "Good"}
+    names = {"ex": "Excellent", "vg": "Very Good", "gd": "Good", "verygood": "Very Good", "excellent": "Excellent",
+             "good": "Good", "fair": "Fair", "poor": "Poor", "ideal": "Ideal"}
     m = re.match(GRADE, s, re.I)
     if not m:
         return s
-    g = m.group(0).lower()
-    return abbrev.get(g, _title(re.sub(r"\s+", " ", g)))
+    return names[re.sub(r"\s+", "", m.group(0).lower())]
 
 
 def normalise_date(s):
-    s = s.strip()
-    m = re.search(r"([A-Za-z]{3,9})\.?\s*(\d{1,2}),?\s*(\d{4})", s)        # January 15, 2024
+    s = re.sub(r"\b0(?=[a-z]{2,8}\b)|\b0(?=ct)", "O", s.strip(), flags=re.I)  # "0ctober" -> "October"
+    m = re.search(r"([A-Za-z]{3,9})\.?\s*(\d{1,2})[,.]?\s*(\d{4})", s)        # January 15, 2024
     if m and m.group(1)[:3].lower() in MONTHS:
         return f"{m.group(3)}-{MONTHS[m.group(1)[:3].lower()]:02d}-{int(m.group(2)):02d}"
-    m = re.search(r"(\d{1,2})\s*([A-Za-z]{3,9})\.?,?\s*(\d{4})", s)        # 15 January 2024
+    m = re.search(r"(\d{1,2})\s*([A-Za-z]{3,9})\.?[,.]?\s*(\d{4})", s)        # 15 January 2024
     if m and m.group(2)[:3].lower() in MONTHS:
         return f"{m.group(3)}-{MONTHS[m.group(2)[:3].lower()]:02d}-{int(m.group(1)):02d}"
     m = re.search(r"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})", s)               # 2024-01-15
@@ -289,6 +291,7 @@ def extract_fields(text):
             out["measurements"] = m.group(0).strip()
     m = MEAS_RE.search(str(out["measurements"] or ""))
     if m:
+        out["measurements"] = m.group(0).strip()
         parts = [float(g.replace(",", ".")) for g in m.groups() if g]
         if len(parts) == 3 and m.group(2):          # "6.45 - 6.48 x 3.98" (round: min-max x depth)
             out["length_mm"], out["width_mm"], out["depth_mm"] = parts

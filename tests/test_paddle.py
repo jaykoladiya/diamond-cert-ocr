@@ -134,3 +134,30 @@ def test_paddle_onednn_error_falls_back(monkeypatch):
     assert "Color Grade | G" in P.run(_png_page())   # first attempt hits the error, retry works
     assert [m["enable_mkldnn"] for m in fake.made] == [True, False]
     assert P._mkldnn is False
+
+
+def _real(name):
+    """PP-OCR boxes from real certificates (cert numbers replaced with made-up ones)."""
+    data = json.loads((HERE / f"fixtures/real_{name}_boxes.json").read_text())
+    lines = P.split_panels(P.merge_words(P.group_lines([(*b["box"], b["text"], b["score"]) for b in data])))
+    return lines, extract_fields(P.lines_to_text(lines))
+
+
+def test_real_igi_two_panel_report():
+    lines, r = _real("igi_2016")
+    assert r["report_number"] == "X1Y23456"                  # "NUMBER  X1Y23456", alphanumeric
+    assert r["shape"] == "Round Brilliant"                   # not the diagram legend beside it
+    assert (r["carat"], r["clarity"], r["cut"], r["polish"]) == (1.01, "VS1", "Good", "Very Good")  # "VERYGOOD"
+    assert r["report_date"] == "2016-01-28" and r["inscription"] == "IGI X1Y23456"
+    assert any(ln[0][4].upper().replace(" ", "") == "COLORGRADE" and len(ln) == 1 for ln in lines)  # re-read
+
+
+@pytest.mark.parametrize("name,cert,date", [("gia_2022_a", "1234567890", "2022-12-15"),
+                                            ("gia_2022_b", "2345678901", "2022-10-12")])
+def test_real_gia_label_not_chained_into_proportions_panel(name, cert, date):
+    lines, r = _real(name)
+    assert r["report_number"] == cert and r["report_date"] == date and r["shape"] == "Round Brilliant"
+    color = [ln for ln in lines if ln[0][4].replace(" ", "").startswith("ColorGrade")]
+    assert color and len(color[0]) == 1      # alone, so the missing letter gets a second read
+    assert not any(ln[0][4].startswith("Clarity Grade") and "Profile" in P.lines_to_text([ln]) for ln in lines)
+    assert r["measurements"].replace(" ", "").endswith("mm") and "%" not in r["measurements"]

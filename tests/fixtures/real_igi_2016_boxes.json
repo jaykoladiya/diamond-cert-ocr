@@ -1,0 +1,752 @@
+[
+{
+"box": [
+132.0,
+8.0,
+278.0,
+31.0
+],
+"text": "INTERNATIONAL",
+"score": 0.896
+},
+{
+"box": [
+133.0,
+32.0,
+282.0,
+54.0
+],
+"text": "GEMOLOGICAL",
+"score": 0.848
+},
+{
+"box": [
+131.0,
+56.0,
+221.0,
+78.0
+],
+"text": "INSTITUTE",
+"score": 0.77
+},
+{
+"box": [
+42.0,
+80.0,
+303.0,
+93.0
+],
+"text": "SCIENTIFIC LABORATORYFORTHE IDENTIFICATION AND GRADING",
+"score": 0.915
+},
+{
+"box": [
+96.0,
+89.0,
+248.0,
+104.0
+],
+"text": "OFDIAMONDANDCOLOREDSTONES",
+"score": 0.901
+},
+{
+"box": [
+119.0,
+103.0,
+226.0,
+116.0
+],
+"text": "EDUCATIONALPROGRAMS",
+"score": 0.924
+},
+{
+"box": [
+145.0,
+142.0,
+249.0,
+156.0
+],
+"text": "ELECTRONICCOPY",
+"score": 0.91
+},
+{
+"box": [
+345.0,
+134.0,
+577.0,
+153.0
+],
+"text": "DIAMONDREPORT",
+"score": 0.871
+},
+{
+"box": [
+367.0,
+154.0,
+561.0,
+168.0
+],
+"text": "This report is a statement of fnediamond's identity",
+"score": 0.792
+},
+{
+"box": [
+367.0,
+165.0,
+561.0,
+178.0
+],
+"text": "and grade including all relevant information.",
+"score": 0.921
+},
+{
+"box": [
+201.0,
+190.0,
+249.0,
+204.0
+],
+"text": "X1Y23456",
+"score": 0.884
+},
+{
+"box": [
+135.0,
+191.0,
+179.0,
+205.0
+],
+"text": " NUMBER",
+"score": 0.815
+},
+{
+"box": [
+335.0,
+190.0,
+467.0,
+203.0
+],
+"text": "HONG KONG, January 28, 2016",
+"score": 0.912
+},
+{
+"box": [
+138.0,
+211.0,
+282.0,
+225.0
+],
+"text": "LABORATORY REPORT (ORIGINAL)",
+"score": 0.882
+},
+{
+"box": [
+345.0,
+211.0,
+464.0,
+224.0
+],
+"text": "TO WHOM IT MAY CONCERN,",
+"score": 0.841
+},
+{
+"box": [
+137.0,
+254.0,
+228.0,
+267.0
+],
+"text": "NATURAL DIAMOND",
+"score": 0.847
+},
+{
+"box": [
+10.0,
+255.0,
+72.0,
+267.0
+],
+"text": "DESCRIPTION",
+"score": 0.792
+},
+{
+"box": [
+365.0,
+250.0,
+563.0,
+261.0
+],
+"text": "The symbois do not usualy refect the size of the charactetstios.",
+"score": 0.864
+},
+{
+"box": [
+8.0,
+265.0,
+83.0,
+280.0
+],
+"text": "SHAPE AND CUT",
+"score": 0.885
+},
+{
+"box": [
+137.0,
+267.0,
+222.0,
+281.0
+],
+"text": "ROUND BRILLIANT",
+"score": 0.928
+},
+{
+"box": [
+385.0,
+269.0,
+544.0,
+282.0
+],
+"text": "Green symbols indicate extemal characteristics.",
+"score": 0.899
+},
+{
+"box": [
+389.0,
+261.0,
+539.0,
+272.0
+],
+"text": "Red symbols indicate imemal characteristics.",
+"score": 0.882
+},
+{
+"box": [
+19.0,
+291.0,
+91.0,
+305.0
+],
+"text": "CARAT WEIGHT",
+"score": 0.876
+},
+{
+"box": [
+138.0,
+291.0,
+193.0,
+305.0
+],
+"text": "1.01CARAT",
+"score": 0.847
+},
+{
+"box": [
+19.0,
+305.0,
+89.0,
+320.0
+],
+"text": "COLORGRADE",
+"score": 0.832
+},
+{
+"box": [
+20.0,
+321.0,
+95.0,
+333.0
+],
+"text": "CLARITY GRADE",
+"score": 0.859
+},
+{
+"box": [
+137.0,
+319.0,
+162.0,
+334.0
+],
+"text": "VS1",
+"score": 0.638
+},
+{
+"box": [
+19.0,
+334.0,
+76.0,
+348.0
+],
+"text": "CUTGRADE",
+"score": 0.851
+},
+{
+"box": [
+138.0,
+334.0,
+170.0,
+349.0
+],
+"text": "GOOD",
+"score": 0.797
+},
+{
+"box": [
+8.0,
+359.0,
+48.0,
+374.0
+],
+"text": "POLISH",
+"score": 0.786
+},
+{
+"box": [
+138.0,
+361.0,
+195.0,
+372.0
+],
+"text": "VERYGOOD",
+"score": 0.84
+},
+{
+"box": [
+9.0,
+372.0,
+63.0,
+386.0
+],
+"text": "SYMMETRY",
+"score": 0.883
+},
+{
+"box": [
+137.0,
+372.0,
+170.0,
+387.0
+],
+"text": "GOOD",
+"score": 0.797
+},
+{
+"box": [
+21.0,
+400.0,
+84.0,
+414.0
+],
+"text": "Measurements",
+"score": 0.91
+},
+{
+"box": [
+137.0,
+400.0,
+227.0,
+414.0
+],
+"text": "6.06-6.15x4.20mm",
+"score": 0.832
+},
+{
+"box": [
+21.0,
+414.0,
+48.0,
+429.0
+],
+"text": "Table",
+"score": 0.781
+},
+{
+"box": [
+139.0,
+415.0,
+167.0,
+428.0
+],
+"text": "54.5%",
+"score": 0.795
+},
+{
+"box": [
+21.0,
+430.0,
+109.0,
+443.0
+],
+"text": "Crown Height - Angle",
+"score": 0.908
+},
+{
+"box": [
+138.0,
+429.0,
+195.0,
+443.0
+],
+"text": "17.5%-37.8\u00b0",
+"score": 0.793
+},
+{
+"box": [
+20.0,
+443.0,
+112.0,
+458.0
+],
+"text": "Pavilion Depth - Angle",
+"score": 0.892
+},
+{
+"box": [
+136.0,
+442.0,
+181.0,
+458.0
+],
+"text": "45%-42",
+"score": 0.817
+},
+{
+"box": [
+400.0,
+436.0,
+530.0,
+447.0
+],
+"text": "Insignitcant extemal detals, vtsible under",
+"score": 0.857
+},
+{
+"box": [
+400.0,
+447.0,
+530.0,
+457.0
+],
+"text": "high magnificattion onily, are not shown",
+"score": 0.868
+},
+{
+"box": [
+20.0,
+457.0,
+92.0,
+473.0
+],
+"text": "Grdle Thickness",
+"score": 0.895
+},
+{
+"box": [
+137.0,
+459.0,
+272.0,
+472.0
+],
+"text": "MEDIUMTOTHICK(FACETED)",
+"score": 0.895
+},
+{
+"box": [
+21.0,
+472.0,
+48.0,
+487.0
+],
+"text": "Culet",
+"score": 0.769
+},
+{
+"box": [
+137.0,
+472.0,
+182.0,
+486.0
+],
+"text": "POINTED",
+"score": 0.828
+},
+{
+"box": [
+20.0,
+485.0,
+72.0,
+502.0
+],
+"text": "Total Depth",
+"score": 0.863
+},
+{
+"box": [
+137.0,
+486.0,
+169.0,
+501.0
+],
+"text": "68.5%",
+"score": 0.829
+},
+{
+"box": [
+10.0,
+503.0,
+85.0,
+514.0
+],
+"text": "FLUORESCENCE",
+"score": 0.892
+},
+{
+"box": [
+136.0,
+501.0,
+169.0,
+516.0
+],
+"text": "NONE",
+"score": 0.713
+},
+{
+"box": [
+135.0,
+527.0,
+226.0,
+541.0
+],
+"text": "Laserscrbe on Girdle:",
+"score": 0.883
+},
+{
+"box": [
+9.0,
+528.0,
+66.0,
+542.0
+],
+"text": "COMMENTS",
+"score": 0.846
+},
+{
+"box": [
+396.0,
+537.0,
+531.0,
+548.0
+],
+"text": "tetos o conoosla eceed incuaty seculy sandodk",
+"score": 0.599
+},
+{
+"box": [
+138.0,
+539.0,
+198.0,
+551.0
+],
+"text": "IGI X1Y23456",
+"score": 0.846
+},
+{
+"box": [
+424.0,
+533.0,
+452.0,
+541.0
+],
+"text": "masad pap",
+"score": 0.644
+},
+{
+"box": [
+466.0,
+611.0,
+484.0,
+632.0
+],
+"text": "82",
+"score": 0.565
+},
+{
+"box": [
+136.0,
+613.0,
+193.0,
+624.0
+],
+"text": "CLARITY GRADE:",
+"score": 0.853
+},
+{
+"box": [
+205.0,
+613.0,
+263.0,
+625.0
+],
+"text": "Iirtemaly Fowies",
+"score": 0.683
+},
+{
+"box": [
+538.0,
+613.0,
+561.0,
+630.0
+],
+"text": "2-P2",
+"score": 0.743
+},
+{
+"box": [
+136.0,
+651.0,
+204.0,
+662.0
+],
+"text": "COLORGRADE\uff1a",
+"score": 0.833
+},
+{
+"box": [
+551.0,
+651.0,
+603.0,
+662.0
+],
+"text": "FANCY COLOR",
+"score": 0.836
+},
+{
+"box": [
+132.0,
+670.0,
+237.0,
+684.0
+],
+"text": "PROPORTION - MARGIN: \u00b1 1%",
+"score": 0.896
+},
+{
+"box": [
+131.0,
+681.0,
+262.0,
+694.0
+],
+"text": "MEASUREMENTS - MARGIN: \u00b1 0.02mm",
+"score": 0.882
+},
+{
+"box": [
+131.0,
+706.0,
+589.0,
+720.0
+],
+"text": "whohoveboensereoftreprofosicnalcodeofericsgoveinget work.aswelasthoroughknowlodgeofcyetologophic,opicdiandphysicd",
+"score": 0.737
+},
+{
+"box": [
+132.0,
+698.0,
+586.0,
+712.0
+],
+"text": "Tegemologedianalysofdomondsprecioustoresandoterminecsmustbecoriedauttygemoogitswemmonyyeosenpetencehmisfaid",
+"score": 0.704
+},
+{
+"box": [
+132.0,
+716.0,
+180.0,
+727.0
+],
+"text": "phenomenon.",
+"score": 0.851
+},
+{
+"box": [
+132.0,
+731.0,
+592.0,
+744.0
+],
+"text": "CunertyencounteedeerysensefocosMorespecdlyoronoahwsofmeoconnddspsongteelctedgeometicdd",
+"score": 0.622
+},
+{
+"box": [
+133.0,
+724.0,
+591.0,
+735.0
+],
+"text": "The idarfficationof the votous species andvatioftesof stones,tedistinctionbetwoennturdlandsynthefcmatorid,as welas vatious tootmentmethods",
+"score": 0.763
+},
+{
+"box": [
+132.0,
+739.0,
+369.0,
+750.0
+],
+"text": "aswollasknowtedge ofdlaspectsinvolvedinthecutingprocessare essential.",
+"score": 0.795
+},
+{
+"box": [
+130.0,
+765.0,
+558.0,
+779.0
+],
+"text": "dtchergodingmethodksNethertheclertnarcnypurchaserot thegemshalogadthaRepofascnappaisdnorasagucantyorwanarty.",
+"score": 0.718
+},
+{
+"box": [
+132.0,
+775.0,
+426.0,
+788.0
+],
+"text": "This report is subject tothe terms and conditions set forth above and on reverse.",
+"score": 0.867
+},
+{
+"box": [
+131.0,
+793.0,
+558.0,
+807.0
+],
+"text": "AicharesenedNopadtiaeotmyberepoducedrtoramtedarytemcabycrymecrwoupemisionwingtomHhemdiond",
+"score": 0.593
+},
+{
+"box": [
+133.0,
+787.0,
+210.0,
+798.0
+],
+"text": "@IG,2000,edrion2013",
+"score": 0.686
+},
+{
+"box": [
+132.0,
+802.0,
+197.0,
+813.0
+],
+"text": "Gemoliogical irsttute",
+"score": 0.73
+}
+]
