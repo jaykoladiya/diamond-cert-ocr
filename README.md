@@ -36,7 +36,10 @@ Linux / macOS: `pip install -r requirements.txt && ./run.sh`.
    second time: leader dots are erased and the label is shown next to its value for context (then the value
    alone, if that still fails). PaddleOCR also re-reads values it is unsure of; Windows OCR reports no
    confidence, so with it only missing or invalid values are re-read.
-4. Common OCR slips are repaired (`S12`→`SI2`, `WS1`→`VVS1`, `GlA`→`GIA`, `Excelent`→`Excellent`).
+4. Colour and clarity are always read several times (different scales, a black-and-white copy) and the
+   majority wins: one read of "VVS 2" can come back as "VS 2"; several rarely agree on the wrong grade.
+   Small screenshots are enlarged first (text under ~10px is unreliable for both engines).
+5. Common OCR slips are repaired (`S12`→`SI2`, `WS1`→`VVS1`, `GlA`→`GIA`, `Excelent`→`Excellent`).
 
 Values printed only inside the GIA proportions diagram (table %, depth %, angles on dossier-style reports)
 have no labels and are left blank for you to fill in.
@@ -62,7 +65,10 @@ The first columns follow the stock-list format, with short codes:
 
 - Shape: trade name from the report's "shape and cutting style" (Round Brilliant → Round,
   Square Modified Brilliant → Princess, Cut-Cornered ... Modified Brilliant → Radiant, ...).
-- C / P / SYM: ID, EX, VG, G, F, P. FLT: NON, FNT, MED, STG, VST (fluorescence colour is dropped).
+- C / P / SYM: ID, EX, VG, G, F, P. FLT: NON, FNT, VSL (very slight), SLT (slight), MED, STG, VST
+  (fluorescence colour is dropped). IGI's online summary gives one "Polish And Symmetry" grade (used for both)
+  and "Proportions" instead of a cut grade (used as C).
+- Clr: D-Z letters as printed; fancy colours in words ("Fancy Yellowish Brown").
 - Ct. is a number shown with two decimals.
 
 After those come the remaining fields: Report Date · Natural / Lab-Grown · Growth Method (CVD/HPHT) ·

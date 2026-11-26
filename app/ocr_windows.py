@@ -121,7 +121,7 @@ def recognize(img):
     """Text of a small strip (label + value) for the second read."""
     import cv2
     h = img.shape[0]
-    strip = _upscale(img, min(4.0, max(1.0, 64 / max(1, h))))
+    strip = _upscale(img, min(4.0, max(1.0, 40 / max(1, h))))  # only enlarge strips that are too small
     strip = cv2.copyMakeBorder(strip, 24, 24, 24, 24, cv2.BORDER_CONSTANT, value=(255, 255, 255))
     text = " ".join(line.text for line in _ocr_lines(strip))
     return text, SCORE if text else 0.0

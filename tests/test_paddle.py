@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from app import ocr, ocr_paddle as P
+from app.excel import format_record
 from app.extract import extract_fields, ocr_fix
 
 HERE = Path(__file__).parent
@@ -161,3 +162,43 @@ def test_real_gia_label_not_chained_into_proportions_panel(name, cert, date):
     assert color and len(color[0]) == 1      # alone, so the missing letter gets a second read
     assert not any(ln[0][4].startswith("Clarity Grade") and "Profile" in P.lines_to_text([ln]) for ln in lines)
     assert r["measurements"].replace(" ", "").endswith("mm") and "%" not in r["measurements"]
+
+
+def test_real_igi_online_summary():
+    """IGI's online 'Diamond Report Summary': one line for polish and symmetry, 'Proportions'
+    in place of a cut grade, 'Table Diameter', 'Very Slight' fluorescence, city before the date."""
+    lines, r = _real("igi_summary_2006")
+    f = format_record(dict(r))
+    assert (f["report_number"], f["shape"], f["carat"]) == ("Q9Z11223", "Round", 0.41)
+    assert any(P._bare_label_key(ln[0][4]) == "color" and len(ln) == 1 for ln in lines)  # read again
+    assert (f["cut"], f["polish"], f["symmetry"], f["fluorescence"]) == ("EX", "VG", "VG", "VSL")
+    assert (r["report_date"], r["table_pct"]) == ("2006-02-20", 60)
+
+
+def test_real_igi_summary_fancy_colour():
+    lines, r = _real("igi_summary_2007")
+    f = format_record(dict(r))
+    assert (f["report_number"], f["shape"], f["carat"]) == ("K7P44556", "Marquise", 0.44)  # read "Marqulse"
+    assert f["clarity"] == "SI1"
+    assert extract_fields("Color Grade | Natural Fancy Yellowish Browr")["color"] == "Fancy Yellowish Brown"
+    assert (f["cut"], f["polish"], f["symmetry"], f["fluorescence"]) == ("G", "G", "G", "SLT")
+    assert r["report_date"] == "2007-12-12"
+
+
+def test_real_gia_cushion_small_screenshot():
+    lines, r = _real("gia_2023_cushion")
+    f = format_record(dict(r))
+    assert (f["report_number"], f["shape"], f["carat"], f["clarity"]) == ("3456789012", "Cushion", 1.0, "VS1")
+    assert (f["symmetry"], f["fluorescence"], f["cut"]) == ("G", "FNT", None)   # GIA gives no cut grade here
+    assert r["report_date"] == "2023-10-27"
+    # the colour value was not detected: its label stands alone, so the second read will run
+    assert any(P._bare_label_key(ln[0][4]) == "color" and len(ln) == 1 for ln in lines)
+
+
+def test_clarity_vote_prefers_vvs_when_read_twice():
+    reads = iter([("Clarity Grade VS 2", .9), ("Clarity Grade VVS2", .9), ("Clarity Grade VS2", .9),
+                  ("Clarity Grade VVS 2", .9), ("Clarity Grade VS2", .9), ("vs2", .5)])
+    import numpy as np
+    img = np.full((30, 200, 3), 255, np.uint8)
+    value, _ = P._vote("clarity", img, img, "Clarity Grade", lambda _img: next(reads), first=("VS 2", .9))
+    assert value == "VVS2"

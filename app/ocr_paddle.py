@@ -215,6 +215,20 @@ def split_panels(lines):
     return out
 
 
+CANONICAL_LABELS = {"colorgrade": ("color", "Color Grade"), "colourgrade": ("color", "Colour Grade"),
+                    "claritygrade": ("clarity", "Clarity Grade")}
+
+
+def _fuzzy_vote_label(text):
+    """(key, proper label) for a misread colour/clarity label ("Colar Grade", "Claity Grade")."""
+    import difflib
+    letters = re.sub(r"[^a-z]", "", text.lower())
+    for form, (key, proper) in CANONICAL_LABELS.items():
+        if difflib.SequenceMatcher(None, letters, form).ratio() >= 0.8:
+            return key, proper
+    return None
+
+
 def _is_bare_label(text):
     return _bare_label_key(text) is not None
 
@@ -242,7 +256,7 @@ def erase_leader_dots(region, text_h=None):
     big = [c for c in comps if c[3] >= 0.35 * h]
     out = region.copy()
     for x, y, w, ch, area in comps:
-        if ch >= 0.35 * h or w >= 0.35 * h:
+        if ch >= 0.35 * h:  # a character; flat marks of any width are dots or blurred dot runs
             continue
         left = any(0 <= x - (b[0] + b[2]) <= 0.6 * h for b in big)
         right = any(0 <= b[0] - (x + w) <= 0.6 * h for b in big)
@@ -284,7 +298,16 @@ def _strip_label(text, label_text=""):
             return m.group(1)
     n = len(re.findall(r"[A-Za-z]+", re.sub(r"\(s\)", "", label_text)))
     words = [w for w in re.split(r"\s+|(?<!\d)[.:·]+|[.:·]+(?!\d)", text) if w]  # "Coor.D", not "2.01"
-    return " ".join(words[n:]) if n and len(words) > n else ""
+    if n and len(words) > n:
+        return " ".join(words[n:])
+    # label and value run together: "ColarGradaE" for "Color Grade" + "E"
+    import difflib
+    lab = re.sub(r"[^A-Za-z]", "", re.sub(r"\(s\)", "", label_text)).lower()
+    compact = re.sub(r"\s+|(?<!\d)[.:·]+|[.:·]+(?!\d)", "", text)
+    if len(lab) >= 4 and len(compact) > len(lab) and \
+            difflib.SequenceMatcher(None, compact[:len(lab)].lower(), lab).ratio() >= 0.7:
+        return compact[len(lab):]
+    return ""
 
 
 def _tidy(value):
@@ -292,10 +315,56 @@ def _tidy(value):
     return re.sub(r"^[\s.·:_\-–,]+|[\s.·:_\-–,]+$", "", value)
 
 
+def _binarize(img):
+    import cv2
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
+    _, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return cv2.cvtColor(bw, cv2.COLOR_GRAY2BGR) if img.ndim == 3 else bw
+
+
+VOTE_KEYS = {"color", "clarity"}  # short grades where one misread glyph changes the value
+VOTE_SCALES = (1.0, 2.0, 0.75, 1.5)
+
+
+def _vote(key, composite, value_img, label_text, recognize, first=None):
+    """Read a short grade several times (label + value at several scales, then the value
+    alone) and keep the majority. Single reads of "VVS 2" come back as "VS 2", "WVS 2" or
+    "VVS 2" depending on scale; the majority is right far more often than any one read."""
+    import cv2
+    from .extract import normalise
+    tally = {}
+    if first:  # the first-pass reading counts as one vote
+        tally[str(normalise(key, ocr_fix(key, _clean_value(first[0]))))] = (1, first[1])
+    reads = [(composite, f) for f in VOTE_SCALES] + [(_binarize(composite), 1.5)] \
+        + ([(value_img, 1.0)] if value_img is not None else [])
+    for i, (img, f) in enumerate(reads):
+        if f != 1.0:
+            img = cv2.resize(img, None, fx=f, fy=f, interpolation=cv2.INTER_CUBIC if f > 1 else cv2.INTER_AREA)
+        text, score = recognize(img)
+        raw = _tidy(text or "") if img is value_img else _tidy(_strip_label(text or "", label_text))
+        if not raw or not _value_ok(key, raw):
+            continue
+        v = str(normalise(key, ocr_fix(key, _clean_value(raw))))
+        n, total = tally.get(v, (0, 0.0))
+        tally[v] = (n + 1, total + score)
+    if not tally:
+        return "", 0.0
+    best = max(tally, key=lambda v: tally[v])  # most votes, then highest summed confidence
+    # OCR drops a V from "VVS" (merging VV into V or W) but does not invent one: VVSn read
+    # at least twice beats VSn
+    if key == "clarity" and best.startswith("VS") and tally.get("V" + best, (0,))[0] >= 2:
+        best = "V" + best
+    n, total = tally[best]
+    return best, total / n
+
+
 def fill_missing_values(lines, img_w, recognize, crop):
-    """For a line holding a bare label whose value is missing, fails the field's check
-    (clarity read as ".S1") or was read with low confidence ("vS1" for VVS1 at 0.51),
-    read the strip to its right once more and keep the more confident valid reading.
+    """Second reads. For a line holding a bare label whose value is missing, fails the field's
+    check (clarity read as ".S1") or was read with low confidence ("vS1" for VVS1 at 0.51), read
+    the strip to its right once more and keep the more confident valid reading. Colour and
+    clarity are always re-read by majority vote (the first reading counts as one vote), also
+    when label and value came back as one phrase: engines without confidence scores (Windows
+    OCR) give no other signal that "VVS2" was read as "VS2".
     The recogniser is shown "label + value" side by side (leader dots erased): a lone
     letter such as a colour grade is misread on its own but reliable with the label as context.
     `crop(x1, y1, x2, y2)` returns the image region; `recognize(region)` -> (text, score)."""
@@ -304,39 +373,65 @@ def fill_missing_values(lines, img_w, recognize, crop):
                     for ln in lines if len(ln) >= 2 and ln[-1][0] - ln[0][0] > 50)
     slope = slopes[len(slopes) // 2] if slopes else 0.0
     for ln in lines:
-        key = _bare_label_key(ln[0][4])
-        if key is None:
-            continue
-        old = " ".join(b[4] for b in ln[1:])
-        old_ok = bool(ln[1:]) and _value_ok(key, old)
-        old_score = min((b[5] for b in ln[1:]), default=0.0)
-        if old_ok and old_score >= REREAD_BELOW:
-            continue
         lab = ln[0]
+        key = _bare_label_key(lab[4])
+        merged = None  # "Clarity Grade ...... VVS2" read as one box: the label part of it
+        fuzzy = _fuzzy_vote_label(lab[4]) if key is None else None
+        if fuzzy:  # misread label: use the proper one so the value lands in the right column
+            key = fuzzy[0]
+            lab = ln[0] = (lab[0], lab[1], lab[2], lab[3], fuzzy[1], lab[5])
+        if key is None:
+            key = _label_at_start(lab[4])
+            if key not in VOTE_KEYS:
+                continue
+            m = _LABEL_RES[key].match(lab[4])
+            merged, old, rest = lab[4][:m.start(1)], m.group(1), ln[1:]
+            old_score = lab[5]
+        else:
+            old, rest = " ".join(b[4] for b in ln[1:]), None
+            old_score = min((b[5] for b in ln[1:]), default=0.0)
+        old_ok = bool(old.strip()) and _value_ok(key, old)
+        if old_ok and old_score >= REREAD_BELOW and key not in VOTE_KEYS:
+            continue
         h = lab[3] - lab[1]
         edge = column_right_edge(lines, lab)
         if edge is None:  # no clear column: furthest-reaching line from the same left margin
             col = [max(b[2] for b in other) for other in lines if abs(other[0][0] - lab[0]) < 2 * h]
             edge = max(col) if col else img_w
-        right = min(img_w, edge + h)
-        if right - lab[2] < h:
-            continue
+        right = min(img_w, max(edge, lab[2]) + h)
         y1, y2 = lab[1] - h * 0.15, lab[3] + h * 0.15
-        label_img = crop(lab[0] - 2, y1, lab[2] + 2, y2)
-        value_img = erase_leader_dots(_level_strip(crop, lab, right, slope, h), text_h=h)
-        if value_img is None:  # nothing printed after the label
-            continue
-        hh = min(label_img.shape[0], value_img.shape[0])
-        gap = np.full((hh, max(4, int(h * 0.5))) + label_img.shape[2:], 255, dtype=label_img.dtype)
-        text, score = recognize(np.hstack([label_img[:hh], gap, value_img[:hh]]))
-        value = _tidy(_strip_label(text or "", lab[4]))
-        if not value:  # engine found the label but not the value beside it: read the value alone
-            text, score = recognize(value_img)
-            value = _tidy(text or "")
+        if merged is not None:
+            composite = erase_leader_dots(crop(lab[0] - 2, y1, right, y2), text_h=h)
+            value_img = None
+            if composite is None:
+                continue
+        else:
+            if right - lab[2] < h:
+                continue
+            label_img = crop(lab[0] - 2, y1, lab[2] + 2, y2)
+            value_img = erase_leader_dots(_level_strip(crop, lab, right, slope, h), text_h=h)
+            if value_img is None:  # nothing printed after the label
+                continue
+            hh = min(label_img.shape[0], value_img.shape[0])
+            gap = np.full((hh, max(4, int(h * 0.5))) + label_img.shape[2:], 255, dtype=label_img.dtype)
+            composite = np.hstack([label_img[:hh], gap, value_img[:hh]])
+        label_text = merged if merged is not None else lab[4]
+        if key in VOTE_KEYS:
+            value, score = _vote(key, composite, value_img, label_text, recognize,
+                                 first=(old, old_score) if old_ok else None)
+        else:
+            text, score = recognize(composite)
+            value = _tidy(_strip_label(text or "", label_text))
+            if not value:  # engine found the label but not the value beside it: read the value alone
+                text, score = recognize(value_img)
+                value = _tidy(text or "")
         if not value or score < 0.6:
             continue
-        if not ln[1:] or (_value_ok(key, value) and (not old_ok or score > old_score)):
-            ln[1:] = [(lab[2] + 2, lab[1], right, lab[3], value, score)]
+        if key in VOTE_KEYS or not ln[1:] or (_value_ok(key, value) and (not old_ok or score > old_score)):
+            if merged is not None:
+                ln[:] = [(lab[0], lab[1], lab[2], lab[3], f"{merged.strip()} {value}", score)] + rest
+            else:
+                ln[1:] = [(lab[2] + 2, lab[1], right, lab[3], value, score)]
     return lines
 
 
@@ -420,13 +515,27 @@ def _run(pages):
     return process_pages(pages, _detect, _recognize)
 
 
+MIN_LONG_SIDE = int(os.environ.get("OCR_MIN_LONG_SIDE", "1600"))
+
+
+def _upscale_small(img):
+    """Screenshots of certificates are often 400-600px wide with ~8px text, below what the
+    detectors read reliably: enlarge small pages (up to 3x) before OCR."""
+    import cv2
+    h, w = img.shape[:2]
+    if max(h, w) >= MIN_LONG_SIDE:
+        return img
+    f = min(3.0, MIN_LONG_SIDE / max(h, w))
+    return cv2.resize(img, (int(w * f), int(h * f)), interpolation=cv2.INTER_CUBIC)
+
+
 def process_pages(pages, detect, recognize):
     """Engine-independent page pipeline: decode, deskew, detect boxes, build lines,
     re-read doubtful values. `detect(img)` -> [(x1, y1, x2, y2, text, score)];
     `recognize(img)` -> (text, score). Used by the PaddleOCR and Windows OCR engines."""
     texts = []
     for mime, data in pages:
-        img = deskew(_decode(mime, data))
+        img = deskew(_upscale_small(_decode(mime, data)))
         lines = split_panels(merge_words(group_lines(detect(img))))
         H, W = img.shape[:2]
 

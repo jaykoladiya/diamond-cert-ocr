@@ -40,7 +40,7 @@ def test_words_become_lines_with_page_coordinates(monkeypatch, fresh):
     assert Wn.available()
     text = ocr.run_ocr("cert.png", _png(), engine="windows")[1]
     assert extract_fields(text)["color"] == "G"
-    assert seen[0][1] == 2000                        # 800px page upscaled 2.5x (capped), like PowerToys
+    assert seen[0][1] == 2400                        # small page enlarged, then upscaled for Windows OCR
     assert calls["closed"] == len(calls["bitmaps"])  # every SoftwareBitmap is closed
 
 

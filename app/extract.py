@@ -44,7 +44,7 @@ KEY_FIELDS = ["report_number", "shape", "carat", "color", "clarity"]
 
 GRADE = r"(?:excellent|very\s*good|good|fair|poor|ideal|ex|vg|gd)"
 CLARITY = r"(?:FL|IF|VVS\s*[12]|VS\s*[12]|SI\s*[123]|I\s*[123]|P\s*[123])"
-FLUOR = r"(?:none|nil|negligible|inert|faint|slight|medium|moderate|very\s*strong|strong)"
+FLUOR = r"(?:none|nil|negligible|inert|faint|very\s*slight|slight|medium|moderate|very\s*strong|strong)"
 
 # key -> (label regex, value validator regex or None)
 LABELS = OrderedDict([
@@ -58,14 +58,16 @@ LABELS = OrderedDict([
     ("measurements", (r"measurements?|dimensions?", r".*\d.*")),
     ("carat", (r"carat\s*weight|weight|carats?", r"\d{1,3}\s*[.,]\s*\d{1,3}.*")),
     ("color", (r"colou?r\s*grade|colou?r(?!\s*(?:scale|origin|distribution))",
-               r"(?:[D-Z](?:\s*(?:-|to)\s*[D-Z])?|fancy\b.*|faint\b.*|very\s*light\b.*|light\b.*)\s*(?:\(.*\))?")),
+               r"(?:[D-Z](?:\s*(?:-|to)\s*[D-Z])?|(?:natural\s*)?fancy\b.*|faint\b.*|very\s*light\b.*|light\b.*)\s*(?:\(.*\))?")),
     ("clarity", (r"clarity\s*grade|clarity(?!\s*characteristics)", CLARITY + r"\b.*")),
     ("cut", (r"cut\s*grade|cut(?!ting)", GRADE + r"\b.*")),
+    ("polish_symmetry", (r"polish\s*(?:and|&|/)\s*symmetry", GRADE + r"\b.*")),
     ("polish", (r"polish", GRADE + r"\b.*")),
+    ("proportions", (r"proportions?(?:\s*grade)?", GRADE + r"\b.*")),
     ("symmetry", (r"symmetry", GRADE + r"\b.*")),
     ("fluorescence", (r"fluorescence(?:\s*intensity)?", FLUOR + r"\b.*")),
     ("depth_pct", (r"total\s*depth(?:\s*%)?|depth\s*(?:%|percentage)?", r"\d{2}(?:[.,]\d+)?\s*%?")),
-    ("table_pct", (r"table\s*(?:size|width|%)?", r"\d{2}(?:[.,]\d+)?\s*%?")),
+    ("table_pct", (r"table\s*(?:size|width|diameter|%)?", r"\d{2}(?:[.,]\d+)?\s*%?")),
     ("crown_angle", (r"crown\s*angle", r"\d{2}(?:[.,]\d+)?\s*°?.*")),
     ("pavilion_angle", (r"pavilion\s*angle", r"\d{2}(?:[.,]\d+)?\s*°?.*")),
     ("girdle", (r"girdle(?:\s*thickness)?", r"[A-Za-z].*")),
@@ -137,6 +139,9 @@ def _fuzzy(value, vocab, cutoff=0.75):
     return None
 
 
+FANCY_WORDS = ["fancy", "light", "intense", "vivid", "deep", "dark", "brown", "brownish", "yellow", "yellowish",
+               "pink", "pinkish", "purple", "purplish", "blue", "bluish", "green", "greenish", "orange", "orangy",
+               "gray", "grayish", "grey", "greyish", "black", "white", "red", "reddish", "violet", "olive", "chameleon"]
 SHAPE_WORDS = ["round", "brilliant", "modified", "oval", "princess", "cushion", "emerald", "pear", "marquise",
                "heart", "radiant", "asscher", "square", "rectangular", "step", "triangular", "baguette",
                "octagonal", "european", "mine", "rose", "trilliant", "shield", "kite", "half", "moon"]
@@ -148,6 +153,7 @@ def ocr_fix(key, v):
     """Repair common OCR character confusions before a value is validated."""
     if key == "clarity":
         t = re.sub(r"\s+", "", v.upper()).replace("W", "VV")      # WS1 -> VVS1
+        t = re.sub(r"^V{3,}", "VV", t)                            # WVS2 / VWVS2 -> VVS2
         t = re.sub(r"^(VV|V)5", r"\1S", t)                      # VV51 -> VVS1
         t = re.sub(r"^5([I1L|!])", r"S\1", t)                     # 5I1 -> SI1
         t = re.sub(r"^S[1IL|!]([123])$", r"SI\1", t)          # S12 / SL2 -> SI2
@@ -158,6 +164,9 @@ def ocr_fix(key, v):
         return t
     if key == "inscription":
         return re.sub(r"\bG[lI1|!]A\b", "GIA", v)
+    if key == "shape":  # "Marqulse" -> "marquise", so the shape check recognises it
+        return " ".join((difflib.get_close_matches(w.lower(), SHAPE_WORDS, 1, 0.8) or [w])[0]
+                        if w.isalpha() and len(w) > 3 else w for w in v.split())
     if key == "color":
         t = v.strip()
         return t.upper() if re.fullmatch(r"[d-z]", t) else t
@@ -191,10 +200,11 @@ def _grade(s):
 
 def normalise_date(s):
     s = re.sub(r"\b0(?=[a-z]{2,8}\b)|\b0(?=ct)", "O", s.strip(), flags=re.I)  # "0ctober" -> "October"
-    m = re.search(r"([A-Za-z]{3,9})\.?\s*(\d{1,2})[,.]?\s*(\d{4})", s)        # January 15, 2024
+    month = r"((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)"
+    m = re.search(month + r"\.?\s*(\d{1,2})[,.]?\s*(\d{4})", s, re.I)        # January 15, 2024
     if m and m.group(1)[:3].lower() in MONTHS:
         return f"{m.group(3)}-{MONTHS[m.group(1)[:3].lower()]:02d}-{int(m.group(2)):02d}"
-    m = re.search(r"(\d{1,2})\s*([A-Za-z]{3,9})\.?[,.]?\s*(\d{4})", s)        # 15 January 2024
+    m = re.search(r"(\d{1,2})\s*" + month + r"\.?[,.]?\s*(\d{4})", s, re.I)        # 15 January 2024
     if m and m.group(2)[:3].lower() in MONTHS:
         return f"{m.group(3)}-{MONTHS[m.group(2)[:3].lower()]:02d}-{int(m.group(1)):02d}"
     m = re.search(r"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})", s)               # 2024-01-15
@@ -223,7 +233,10 @@ def normalise(key, v):
         m = re.match(r"([D-Z])(?:\s*(?:-|to)\s*([D-Z]))?\b", v.strip(), re.I)
         if m and len(v.strip()) <= 12:
             return m.group(1).upper() + (f"-{m.group(2).upper()}" if m.group(2) else "")
-        return _title(v)
+        v = re.sub(r"(?i)^natural\s*(?=fancy)", "", v.strip())
+        words = [(difflib.get_close_matches(w.lower(), FANCY_WORDS, 1, 0.8) or [w])[0] if w.isalpha() and len(w) > 3 else w
+                 for w in v.split()]                                              # Browr -> brown
+        return _title(" ".join(words))
     if key == "clarity":
         m = re.match(CLARITY, v.strip(), re.I)
         return re.sub(r"\s+", "", m.group(0)).upper() if m else v
@@ -273,6 +286,11 @@ def extract_fields(text):
             found[key] = value
             break  # one field per token
 
+    if "polish_symmetry" in found:  # IGI: one grade for both
+        found.setdefault("polish", found["polish_symmetry"])
+        found.setdefault("symmetry", found["polish_symmetry"])
+    if "proportions" in found:      # IGI: proportions grade stands in for cut grade
+        found.setdefault("cut", found["proportions"])
     out = OrderedDict((k, None) for k in FIELD_KEYS)
     for k in FIELD_KEYS:
         if k in found:

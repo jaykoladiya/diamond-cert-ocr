@@ -19,7 +19,8 @@ NUMERIC_FORMATS = {"carat": "0.00", "length_mm": "0.00", "width_mm": "0.00", "de
                    "depth_pct": "0.0", "table_pct": "0.0", "crown_angle": "0.0", "pavilion_angle": "0.0"}
 
 GRADE_CODES = {"ideal": "ID", "excellent": "EX", "very good": "VG", "good": "G", "fair": "F", "poor": "P"}
-FLUOR_CODES = {"none": "NON", "nil": "NON", "inert": "NON", "negligible": "NON", "faint": "FNT", "slight": "FNT",
+FLUOR_CODES = {"none": "NON", "nil": "NON", "inert": "NON", "negligible": "NON", "faint": "FNT",
+               "very slight": "VSL", "slight": "SLT",
                "medium": "MED", "moderate": "MED", "strong": "STG", "very strong": "VST"}
 # GIA/IGI "shape and cutting style" -> trade shape name; first match wins
 SHAPES = [

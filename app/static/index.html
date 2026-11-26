@@ -131,7 +131,8 @@ function render() {
   rows.forEach((r, i) => {
     h += `<tr data-i="${i}" class="${r.id === selected ? "sel" : ""}"><td class="ctrl"><button data-view="${i}" title="View certificate & OCR text">👁</button> <button data-del="${i}" title="Remove row">✕</button></td>`;
     for (const c of COLUMNS) {
-      const v = r.record[c.key] ?? "";
+      let v = r.record[c.key] ?? "";
+      if (c.key === "carat" && typeof v === "number") v = v.toFixed(2);   // 1 -> 1.00, as in Excel
       const miss = KEY.includes(c.key) && (v === "" || v === null);
       h += `<td class="${miss ? "missing" : ""}"><input data-k="${c.key}" value="${String(v).replace(/&/g,"&amp;").replace(/"/g, "&quot;")}" size="${Math.min(Math.max(String(v).length, 6), 40)}"></td>`;
     }
