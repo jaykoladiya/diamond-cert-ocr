@@ -163,6 +163,11 @@ FLUOR_WORDS = ["none", "faint", "medium", "strong", "very strong", "negligible",
 def ocr_fix(key, v):
     """Repair common OCR character confusions before a value is validated."""
     if key == "clarity":
+        words = re.sub(r"[^a-z ]", "", v.lower()).strip()
+        if difflib.SequenceMatcher(None, words[:19], "internally flawless").ratio() >= 0.8:
+            return "IF"                                         # also "Internaly Flawles"
+        if difflib.SequenceMatcher(None, words[:8], "flawless").ratio() >= 0.8:
+            return "FL"
         t = re.sub(r"\s+", "", v.upper()).replace("W", "VV")      # WS1 -> VVS1
         t = re.sub(r"^V{3,}", "VV", t)                            # WVS2 / VWVS2 -> VVS2
         t = re.sub(r"^(VV|V)5", r"\1S", t)                      # VV51 -> VVS1
@@ -278,6 +283,19 @@ def normalise(key, v):
 
 # ── extraction ───────────────────────────────────────────────────────────────
 
+def _is_scale(key, value, following):
+    """True when a colour/clarity label is followed by the grading scale, not a grade."""
+    for n, t in enumerate(following):  # what belongs to this label ends at the next label
+        if _is_label(t):
+            following = following[:n]
+            break
+    if key == "clarity":
+        hits = [t for t in [value, *following] if re.fullmatch(r"(VVS|VS|SI|I|P)\s?[123]|FL|IF", t.strip(), re.I)]
+        return len(hits) >= 2 or len(re.findall(r"\b(?:VVS|VS|SI)\s?[12]\b", value, re.I)) >= 2
+    letters = [t for t in [value, *following] if re.fullmatch(r"[D-Z]", t.strip())]
+    return len(letters) >= 3 or bool(re.fullmatch(r"(?:[D-Z]\s+){3,}[D-Z].*", value.strip()))
+
+
 def extract_fields(text):
     """Return an OrderedDict of FIELD_KEYS -> value (None when not found)."""
     tokens = to_tokens(text)
@@ -292,10 +310,14 @@ def extract_fields(text):
             if not m:
                 continue
             value = _clean_value(m.group(1))
+            nxt = i + 1                      # first token after the value
             if not value and i + 1 < len(tokens) and not _is_label(tokens[i + 1]):
                 value = _clean_value(tokens[i + 1])
+                nxt = i + 2
             if not value:
                 continue
+            if key in ("clarity", "color") and _is_scale(key, value, tokens[nxt:nxt + 5]):
+                continue  # "CLARITY GRADE: Internally Flawless VVS1 VVS2 ...": the printed scale
             value = ocr_fix(key, value)
             valid = _VALID_RES[key]
             if valid and not valid.match(value):
@@ -347,10 +369,11 @@ def extract_fields(text):
         m = re.search(r"(\d{1,2}[.,]\d{2,3})\s*(?:carats?|cts?)\b", flat, re.I)
         if m:
             out["carat"] = _num(m.group(1))
-    if out["clarity"] is None:
-        m = re.search(r"\b(FL|IF|VVS\s?[12]|VS\s?[12]|SI\s?[123]|I[123])\b", flat)
-        if m:
-            out["clarity"] = re.sub(r"\s", "", m.group(1))
+    if out["clarity"] is None:  # no labelled grade: only if exactly one grade appears (not a printed scale)
+        grades = {re.sub(r"\s", "", g).upper()
+                  for g in re.findall(r"\b(FL|IF|VVS\s?[12]|VS\s?[12]|SI\s?[123]|I[123])\b", flat)}
+        if len(grades) == 1:
+            out["clarity"] = grades.pop()
     if out["report_number"] is None:
         m = re.search(r"(?:report|certificate|no\.?|#)\D{0,15}((?:LG)?\d{7,10})\b", flat, re.I)
         if m:

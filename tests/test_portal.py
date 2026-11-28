@@ -243,3 +243,18 @@ def test_fluorescence_with_colour(text, flt, colour):
 
 def test_misread_crown_height_label():
     assert extract_fields("Crown Helght | 18%")["crown_height"] == 18
+
+
+@pytest.mark.parametrize("text,grade", [
+    ("Clarity Grade | Flawless", "FL"), ("Clarity Grade ...... FLAWLESS", "FL"), ("Clarity Grade | Flawles", "FL"),
+    ("Clarity Grade | Internally Flawless", "IF"), ("Clarity Grade | Internaly Flawles", "IF"),
+    ("Clarity Grade | VS1\nCLARITY GRADE: | Internally Flawless | VVS1 | VVS2", "VS1"),
+    ("CLARITY GRADE: | Internally Flawless | VVS1 | VVS2 | VS1 | VS2", None),   # only the printed scale
+])
+def test_clarity_words_and_printed_scales(text, grade):
+    assert extract_fields(text)["clarity"] == grade
+
+
+def test_colour_scale_is_not_a_grade():
+    assert extract_fields("COLOR GRADE: | D | E | F | G | H")["color"] is None
+    assert extract_fields("Color Grade | G\nCOLOR GRADE: D E F G H I J")["color"] == "G"
