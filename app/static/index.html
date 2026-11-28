@@ -17,7 +17,12 @@
   .dot.ok { background:#4cd685; } .dot.bad { background:#ff6b6b; }
   main { padding:20px 24px; max-width:1600px; margin:0 auto; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:18px; }
-  #drop { border:2px dashed #b8c2cf; border-radius:10px; padding:28px; text-align:center; color:var(--muted); cursor:pointer; transition:.15s; }
+  #pasteRow { display:flex; gap:8px; align-items:stretch; }
+  #pasteBar { flex:1; resize:none; font:inherit; font-size:15px; padding:11px 14px; border:2px solid #b8c2cf; border-radius:10px; outline:none; min-height:46px; max-height:160px; transition:.15s; }
+  #pasteBar:focus { border-color:var(--accent); box-shadow:0 0 0 3px #2f6fde22; }
+  #pasteBar.flash { border-color:var(--ok); background:#effaf3; }
+  #drop { border:2px dashed #b8c2cf; border-radius:10px; padding:14px; text-align:center; color:var(--muted); cursor:pointer; transition:.15s; }
+  .chip img { height:22px; width:auto; border-radius:3px; border:1px solid var(--line); }
   #drop.over { border-color:var(--accent); background:#eef4ff; color:var(--ink); }
   #drop strong { color:var(--ink); font-size:15px; }
   #queue { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
@@ -66,26 +71,24 @@
 </header>
 <main>
   <section class="card">
+    <div id="pasteRow">
+      <textarea id="pasteBar" rows="1" spellcheck="false"
+        placeholder="Paste a certificate image here (Ctrl+V) — or paste / type GIA report numbers and press Enter"></textarea>
+      <button id="pasteBtn" title="Paste an image or numbers from the clipboard">📋 Paste</button>
+      <button id="goBtn" class="primary" title="Look up the GIA numbers typed in the bar">Look up</button>
+      <button id="browseBtn" title="Choose certificate files">📁 Upload files</button>
+    </div>
+    <div class="muted" id="pasteHint" style="margin:6px 2px 10px">
+      Screenshot a certificate (Win+Shift+S) or copy an image, then press Ctrl+V anywhere on this page.
+      GIA numbers are looked up online and read exactly; images and PDFs are read by OCR.
+    </div>
     <div id="drop">
-      <strong>Drop certificate files here</strong> or click to choose<br>
-      <span class="muted">PDF, JPG, PNG, TIFF, WEBP — one certificate per file, many files at once</span>
+      <strong>Or drop certificate files here</strong> <span class="muted">— PDF, JPG, PNG, TIFF, WEBP · many at once</span>
       <input id="file" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.webp,.bmp" hidden>
     </div>
     <div id="queue"></div>
   </section>
 
-  <section class="card" id="lookupCard" style="display:none">
-    <div class="row" style="align-items:flex-start">
-      <div style="flex:1">
-        <strong>Look up GIA reports by number</strong>
-        <div class="muted">Paste GIA report numbers, one per line, or whole lines from a stock list: the 10-digit numbers are picked out.
-          Each report PDF is downloaded once and read exactly (no OCR).</div>
-        <textarea id="lookupText" rows="3" placeholder="2517492150&#10;6237628416" style="width:100%;margin-top:8px;font:inherit;padding:8px;border:1px solid var(--line);border-radius:7px"></textarea>
-      </div>
-      <button id="lookupBtn" class="primary" style="margin-top:22px">Look up</button>
-    </div>
-    <div id="lookupQueue" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px"></div>
-  </section>
 
   <section class="card">
     <div class="row" style="margin-bottom:12px">
@@ -135,7 +138,11 @@ async function checkStatus() {
     const pick = sel.value === "auto" ? s : { ok: true, label: s.engines.find(e => e.key === sel.value).label };
     $("#statusText").textContent = pick.ok ? (sel.value === "auto" ? `Using ${pick.label}` : "") : pick.label;
     $("#dot").className = "dot " + (pick.ok ? "ok" : "bad");
-    $("#lookupCard").style.display = s.lookup ? "" : "none";
+    LOOKUP = !!s.lookup;
+    $("#goBtn").style.display = LOOKUP ? "" : "none";
+    $("#pasteBar").placeholder = LOOKUP
+      ? "Paste a certificate image here (Ctrl+V) — or paste / type GIA report numbers and press Enter"
+      : "Paste a certificate image here (Ctrl+V)";
   } catch { $("#dot").className = "dot bad"; $("#statusText").textContent = "Portal unreachable"; }
 }
 
@@ -201,7 +208,11 @@ $("#file").onchange = e => { handle([...e.target.files]); e.target.value = ""; }
 drop.addEventListener("drop", e => handle([...e.dataTransfer.files]));
 
 async function handle(list) {
-  const queue = list.map(f => { const chip = document.createElement("span"); chip.className = "chip"; chip.textContent = f.name; $("#queue").appendChild(chip); return { f, chip }; });
+  const queue = list.map(f => {
+    const chip = document.createElement("span"); chip.className = "chip"; chip.textContent = f.name;
+    if (f.type.startsWith("image/")) { const im = document.createElement("img"); im.src = URL.createObjectURL(f); chip.prepend(im); }
+    $("#queue").appendChild(chip); return { f, chip };
+  });
   const workers = Array.from({ length: 3 }, async () => {
     while (queue.length) {
       const { f, chip } = queue.shift();
@@ -215,22 +226,76 @@ async function handle(list) {
         const id = uid(); files[id] = f;
         rows.push({ id, record: out.record, missing: out.missing, markdown: out.markdown });
         save(); render();
+        const im = chip.querySelector("img");
         chip.className = "chip done"; chip.textContent = `✓ ${f.name}` + (out.missing.length ? ` (${out.missing.length} to check)` : "");
+        if (im) chip.prepend(im);
       } catch (err) {
+        const im = chip.querySelector("img");
         chip.className = "chip fail"; chip.textContent = `✕ ${f.name}: ${err.message}`; chip.title = err.message;
+        if (im) chip.prepend(im);
       }
     }
   });
   await Promise.all(workers);
 }
 
-// ── look up by GIA report number ───────────────────────────
-$("#lookupBtn").onclick = async () => {
-  const text = $("#lookupText").value.trim();
-  if (!text) return toast("Paste one or more GIA report numbers first.");
-  const btn = $("#lookupBtn"); btn.disabled = true; btn.textContent = "Looking up…";
-  const chip = document.createElement("span"); chip.className = "chip run"; chip.textContent = "Downloading reports…";
-  $("#lookupQueue").appendChild(chip);
+// ── paste bar: certificate images (Ctrl+V) and GIA report numbers ──
+let LOOKUP = false;
+const bar = $("#pasteBar");
+function autosize() { bar.style.height = "auto"; bar.style.height = Math.min(bar.scrollHeight + 2, 160) + "px"; }
+bar.addEventListener("input", autosize);
+function flash() { bar.classList.add("flash"); setTimeout(() => bar.classList.remove("flash"), 700); }
+
+function clipboardFiles(dt) {     // images / PDFs from a paste or drop (screenshots come as image/png)
+  const out = [];
+  for (const it of dt.items || []) if (it.kind === "file") { const f = it.getAsFile(); if (f) out.push(f); }
+  if (!out.length) out.push(...(dt.files || []));
+  return out.filter(f => /^image\//.test(f.type) || f.type === "application/pdf");
+}
+let pasteCount = 0;
+function named(files) {          // clipboard images are all called "image.png": give each its own name
+  const t = new Date(), stamp = `${t.getHours()}${String(t.getMinutes()).padStart(2, "0")}${String(t.getSeconds()).padStart(2, "0")}`;
+  return files.map(f => {
+    if (f.name && f.name !== "image.png" && f.name !== "image.jpg") return f;
+    const ext = (f.type.split("/")[1] || "png").replace("jpeg", "jpg");
+    return new File([f], `pasted-${stamp}-${++pasteCount}.${ext}`, { type: f.type });
+  });
+}
+document.addEventListener("paste", e => {
+  const files = clipboardFiles(e.clipboardData || {});
+  if (!files.length) return;               // plain text: let it go where the cursor is
+  e.preventDefault();
+  flash();
+  handle(named(files));
+});
+$("#pasteBtn").onclick = async () => {     // button for people who prefer clicking (asks clipboard permission)
+  try {
+    const items = await navigator.clipboard.read();
+    const files = [];
+    for (const it of items) {
+      const type = it.types.find(t => t.startsWith("image/"));
+      if (type) files.push(new File([await it.getType(type)], "image.png", { type }));
+      else if (it.types.includes("text/plain")) {
+        bar.value = (bar.value ? bar.value + "\n" : "") + await (await it.getType("text/plain")).text(); autosize();
+      }
+    }
+    if (files.length) { flash(); handle(named(files)); }
+    else if (!bar.value.trim()) toast("The clipboard has no image or text. Copy a certificate image first.");
+    bar.focus();
+  } catch { toast("Click the bar and press Ctrl+V to paste (the browser blocked clipboard access)."); bar.focus(); }
+};
+$("#browseBtn").onclick = () => $("#file").click();
+bar.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); lookupNumbers(); } });
+$("#goBtn").onclick = () => lookupNumbers();
+
+async function lookupNumbers() {
+  const text = bar.value.trim();
+  if (!text) return toast("Paste a certificate image, or type GIA report numbers.");
+  if (!LOOKUP) return toast("Looking up by number is turned off on this portal.");
+  if (!/\d{7,10}/.test(text)) return toast("No GIA report numbers found (GIA numbers have 10 digits).");
+  const btn = $("#goBtn"); btn.disabled = true; btn.textContent = "Looking up…";
+  const chip = document.createElement("span"); chip.className = "chip run"; chip.textContent = "Downloading GIA reports…";
+  $("#queue").appendChild(chip);
   try {
     const fd = new FormData(); fd.append("numbers", text);
     const res = await fetch("/api/lookup", { method: "POST", body: fd });
@@ -244,13 +309,13 @@ $("#lookupBtn").onclick = async () => {
         rows.push({ id: uid(), record: out.record, missing: out.missing, markdown: out.markdown, pdf: out.pdf });
         c.className = "chip done"; c.textContent = "✓ " + out.source_file;
       }
-      $("#lookupQueue").appendChild(c);
+      $("#queue").appendChild(c);
     }
     save(); render();
-    $("#lookupText").value = "";
+    bar.value = ""; autosize();
   } catch (err) { chip.className = "chip fail"; chip.textContent = "✕ " + err.message; }
   finally { btn.disabled = false; btn.textContent = "Look up"; }
-};
+}
 
 // ── export ──────────────────────────────────────────────────
 async function exportXlsx(template) {

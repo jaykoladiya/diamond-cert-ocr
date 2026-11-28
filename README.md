@@ -27,9 +27,18 @@ Three OCR engines. Pick one in the **Engine** menu at the top of the page, or le
 
 Linux / macOS: `pip install -r requirements.txt && ./run.sh`.
 
+### Paste bar
+The bar at the top takes whatever you paste:
+- **A certificate image**: take a screenshot (Win+Shift+S) or copy an image (WhatsApp, a website, a file in
+  Explorer) and press **Ctrl+V** anywhere on the page. It is read straight away. **📋 Paste** does the same with
+  a click (the browser asks once for clipboard permission).
+- **GIA report numbers**: paste or type them (or whole stock-list lines) and press **Enter** / **Look up**.
+
+**📁 Upload files** and drag-and-drop still work as before.
+
 ### Look up GIA reports by number
-Paste GIA report numbers into **Look up GIA reports by number** (one per line, or whole stock-list lines:
-the 7-10 digit numbers are picked out) and press **Look up**. Each report PDF is downloaded and read from its
+Paste GIA report numbers into the paste bar (one per line, or whole stock-list lines: the 7-10 digit numbers
+are picked out) and press **Enter** or **Look up**. Each report PDF is downloaded and read from its
 text layer, so the row is exact; the 👁 viewer shows the PDF.
 
 - Source: `REPORT_PDF_URL`, `{report}` is replaced by the number. Default: the report-PDF link a supplier
