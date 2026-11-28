@@ -74,6 +74,19 @@
     <div id="queue"></div>
   </section>
 
+  <section class="card" id="lookupCard" style="display:none">
+    <div class="row" style="align-items:flex-start">
+      <div style="flex:1">
+        <strong>Look up GIA reports by number</strong>
+        <div class="muted">Paste GIA report numbers, one per line, or whole lines from a stock list: the 10-digit numbers are picked out.
+          Each report PDF is downloaded once and read exactly (no OCR).</div>
+        <textarea id="lookupText" rows="3" placeholder="2517492150&#10;6237628416" style="width:100%;margin-top:8px;font:inherit;padding:8px;border:1px solid var(--line);border-radius:7px"></textarea>
+      </div>
+      <button id="lookupBtn" class="primary" style="margin-top:22px">Look up</button>
+    </div>
+    <div id="lookupQueue" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px"></div>
+  </section>
+
   <section class="card">
     <div class="row" style="margin-bottom:12px">
       <strong id="count">0 certificates</strong>
@@ -122,6 +135,7 @@ async function checkStatus() {
     const pick = sel.value === "auto" ? s : { ok: true, label: s.engines.find(e => e.key === sel.value).label };
     $("#statusText").textContent = pick.ok ? (sel.value === "auto" ? `Using ${pick.label}` : "") : pick.label;
     $("#dot").className = "dot " + (pick.ok ? "ok" : "bad");
+    $("#lookupCard").style.display = s.lookup ? "" : "none";
   } catch { $("#dot").className = "dot bad"; $("#statusText").textContent = "Portal unreachable"; }
 }
 
@@ -169,7 +183,8 @@ function showViewer(r) {
   $("#viewerTitle").textContent = r.record.source_file || "Certificate";
   $("#ocrText").textContent = r.markdown || "(no OCR text)";
   const f = files[r.id], p = $("#preview");
-  if (!f) p.innerHTML = `<div class="empty">Original file preview is only available in the session it was uploaded.</div>`;
+  if (!f && r.pdf) p.innerHTML = `<iframe src="${r.pdf}"></iframe>`;   // looked-up report
+  else if (!f) p.innerHTML = `<div class="empty">Original file preview is only available in the session it was uploaded.</div>`;
   else if (f.type === "application/pdf") p.innerHTML = `<iframe src="${URL.createObjectURL(f)}"></iframe>`;
   else p.innerHTML = `<img src="${URL.createObjectURL(f)}">`;
   $("#viewerCard").scrollIntoView({ behavior: "smooth" });
@@ -208,6 +223,34 @@ async function handle(list) {
   });
   await Promise.all(workers);
 }
+
+// ── look up by GIA report number ───────────────────────────
+$("#lookupBtn").onclick = async () => {
+  const text = $("#lookupText").value.trim();
+  if (!text) return toast("Paste one or more GIA report numbers first.");
+  const btn = $("#lookupBtn"); btn.disabled = true; btn.textContent = "Looking up…";
+  const chip = document.createElement("span"); chip.className = "chip run"; chip.textContent = "Downloading reports…";
+  $("#lookupQueue").appendChild(chip);
+  try {
+    const fd = new FormData(); fd.append("numbers", text);
+    const res = await fetch("/api/lookup", { method: "POST", body: fd });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || res.status);
+    chip.remove();
+    for (const out of body.results) {
+      const c = document.createElement("span");
+      if (out.error) { c.className = "chip fail"; c.textContent = "✕ " + out.error; }
+      else {
+        rows.push({ id: uid(), record: out.record, missing: out.missing, markdown: out.markdown, pdf: out.pdf });
+        c.className = "chip done"; c.textContent = "✓ " + out.source_file;
+      }
+      $("#lookupQueue").appendChild(c);
+    }
+    save(); render();
+    $("#lookupText").value = "";
+  } catch (err) { chip.className = "chip fail"; chip.textContent = "✕ " + err.message; }
+  finally { btn.disabled = false; btn.textContent = "Look up"; }
+};
 
 // ── export ──────────────────────────────────────────────────
 async function exportXlsx(template) {

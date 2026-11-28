@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import ocr
+from . import lookup, ocr
 from .excel import COLUMNS, build_workbook, format_record
 from .extract import KEY_FIELDS, extract_fields, missing_key_fields
 
@@ -64,6 +64,38 @@ async def extract(files: list[UploadFile] = File(...), engine: str = Form("auto"
     if engine not in ("auto", *ocr.ENGINE_LABELS):
         raise HTTPException(400, f"Unknown engine: {engine}")
     return {"results": await asyncio.gather(*(_process(f, engine) for f in files))}
+
+
+@app.post("/api/lookup")
+async def lookup_reports(numbers: str = Form(...)):
+    """Rows from GIA report numbers (pasted text): report PDF -> text layer -> fields."""
+    reports = lookup.parse_numbers(numbers)
+    if not reports:
+        raise HTTPException(400, "No GIA report numbers found (GIA numbers have 10 digits)")
+    if len(reports) > lookup.MAX_PER_REQUEST:
+        raise HTTPException(400, f"At most {lookup.MAX_PER_REQUEST} report numbers at a time")
+    results = []
+    for report in reports:  # one after another: lookup.fetch_pdf paces the downloads
+        name = f"GIA {report} (online)"
+        try:
+            _, text = await run_in_threadpool(lookup.lookup, report)
+        except lookup.ReportLookupError as e:
+            results.append({"source_file": name, "error": str(e)})
+            continue
+        record = dict(extract_fields(text))
+        record["source_file"] = name
+        record = format_record(record)
+        results.append({"source_file": name, "record": record, "missing": missing_key_fields(record),
+                        "markdown": text, "pdf": f"/api/report/{report}.pdf"})
+    return {"results": results}
+
+
+@app.get("/api/report/{report}.pdf")
+def report_pdf(report: str):
+    path = lookup.cached_pdf(report) if report.isdigit() else None
+    if not path:
+        raise HTTPException(404, "Report not downloaded")
+    return FileResponse(path, media_type="application/pdf")
 
 
 @app.post("/api/export")

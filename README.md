@@ -27,6 +27,18 @@ Three OCR engines. Pick one in the **Engine** menu at the top of the page, or le
 
 Linux / macOS: `pip install -r requirements.txt && ./run.sh`.
 
+### Look up GIA reports by number
+Paste GIA report numbers into **Look up GIA reports by number** (one per line, or whole stock-list lines:
+the 7-10 digit numbers are picked out) and press **Look up**. Each report PDF is downloaded and read from its
+text layer, so the row is exact; the 👁 viewer shows the PDF.
+
+- Source: `REPORT_PDF_URL`, `{report}` is replaced by the number. Default: the report-PDF link a supplier
+  includes in its public stock lists, ``.
+  Set `REPORT_PDF_URL=off` to hide the feature, or point it at another source.
+- Downloads go one at a time, 1 second apart (`REPORT_PAUSE_SECONDS`), at most 50 numbers per lookup, and each
+  PDF is saved in `reports/` (`REPORT_CACHE_DIR`), so a report is downloaded only once.
+- A PDF that is not for the requested number is rejected.
+
 ### Digital PDFs: no OCR at all
 Report PDFs downloaded from GIA (and most lab PDFs) carry a text layer. The portal reads that text directly,
 so every value is exact and instant, whichever engine is selected. Scans and photos saved as PDF have no

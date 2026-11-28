@@ -11,6 +11,7 @@ import base64
 import io
 import json
 import os
+import re
 import time
 
 import requests
@@ -110,6 +111,9 @@ def pdf_text(data):
         return None
     text = "\n".join(page.get_text("text") for i, page in enumerate(doc) if i < MAX_PAGES)
     doc.close()
+    # GIA background microprint: "GEMOLOGICAL INSTITUTE OF AMERICA" repeated across the page
+    text = re.sub(r"(?:GE\s?MOLOGICAL\s+INSTITUTE\s+OF\s+AME\s?RICA\s*){2,}", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
     found = extract_fields(text)
     # use it only if it really carries the grading (not just a scanned image with a caption)
     return text if sum(found[k] not in (None, "") for k in KEY_FIELDS) >= 3 else None
@@ -200,4 +204,6 @@ def server_status():
     label = ENGINE_LABELS.get(backend, "No OCR engine available")
     if backend == "unlimited":
         label += f" at {OCR_URL}"
-    return {"ok": backend is not None, "backend": backend, "label": label, "engines": engines}
+    from . import lookup
+    return {"ok": backend is not None, "backend": backend, "label": label, "engines": engines,
+            "lookup": lookup.enabled()}
