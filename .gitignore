@@ -5,3 +5,4 @@ __pycache__/
 *.xlsx
 !tests/**/*.xlsx
 reports/
+local_settings.json

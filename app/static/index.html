@@ -67,9 +67,24 @@
     <label for="engine" style="opacity:.85">Engine</label>
     <select id="engine" title="Which OCR engine reads the certificates"><option value="auto">Automatic</option></select>
     <span id="dot" class="dot"></span><span id="statusText">Checking OCR engine…</span>
+    <button id="settingsBtn" title="Settings" style="margin-left:6px;background:#28496f;color:#fff;border-color:#4a6585;padding:3px 9px">⚙ Settings</button>
   </div>
 </header>
 <main>
+  <section class="card" id="settingsCard" style="display:none">
+    <div class="row" style="margin-bottom:8px"><strong>Settings</strong><span class="spacer"></span><button id="closeSettings">Close</button></div>
+    <label for="reportLink"><strong>GIA report PDF link</strong></label>
+    <div class="muted" style="margin:2px 0 8px">Paste one link that opens a GIA report PDF, with its report number in it. The portal puts
+      each number you look up in its place. Saved only on this computer (local_settings.json), never uploaded to GitHub.</div>
+    <div class="row">
+      <input id="reportLink" type="text" spellcheck="false" placeholder="https://…?reportno=1234567890"
+        style="flex:1;font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:7px">
+      <button id="saveLink" class="primary">Save</button>
+      <button id="clearLink">Clear</button>
+    </div>
+    <div class="muted" id="linkState" style="margin-top:6px"></div>
+  </section>
+
   <section class="card">
     <div id="pasteRow">
       <textarea id="pasteBar" rows="1" spellcheck="false"
@@ -139,10 +154,6 @@ async function checkStatus() {
     $("#statusText").textContent = pick.ok ? (sel.value === "auto" ? `Using ${pick.label}` : "") : pick.label;
     $("#dot").className = "dot " + (pick.ok ? "ok" : "bad");
     LOOKUP = !!s.lookup;
-    $("#goBtn").style.display = LOOKUP ? "" : "none";
-    $("#pasteBar").placeholder = LOOKUP
-      ? "Paste a certificate image here (Ctrl+V) — or paste / type GIA report numbers and press Enter"
-      : "Paste a certificate image here (Ctrl+V)";
   } catch { $("#dot").className = "dot bad"; $("#statusText").textContent = "Portal unreachable"; }
 }
 
@@ -288,10 +299,34 @@ $("#browseBtn").onclick = () => $("#file").click();
 bar.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); lookupNumbers(); } });
 $("#goBtn").onclick = () => lookupNumbers();
 
+// ── settings (saved on this computer only) ──
+async function openSettings(msg) {
+  const st = await (await fetch("/api/settings")).json();
+  $("#reportLink").value = st.report_pdf_url ? st.report_pdf_url.replace("{report}", "1234567890") : "";
+  $("#linkState").textContent = msg || (st.from_env ? "Set by the REPORT_PDF_URL environment variable."
+    : st.report_pdf_url ? "Link saved: looking up by number is on." : "No link saved: looking up by number is off.");
+  $("#settingsCard").style.display = "block";
+  $("#reportLink").focus();
+}
+$("#settingsBtn").onclick = () => openSettings();
+$("#closeSettings").onclick = () => { $("#settingsCard").style.display = "none"; };
+async function saveLink(value) {
+  const fd = new FormData(); fd.append("report_pdf_url", value);
+  const res = await fetch("/api/settings", { method: "POST", body: fd });
+  const body = await res.json();
+  if (!res.ok) { $("#linkState").textContent = "✕ " + body.detail; return; }
+  LOOKUP = !!body.report_pdf_url;
+  $("#linkState").textContent = LOOKUP ? "✓ Saved. Paste or type GIA numbers in the bar and press Enter." : "Link cleared: looking up by number is off.";
+  if (!LOOKUP) $("#reportLink").value = "";
+}
+$("#saveLink").onclick = () => saveLink($("#reportLink").value.trim());
+$("#clearLink").onclick = () => saveLink("");
+$("#reportLink").addEventListener("keydown", e => { if (e.key === "Enter") saveLink($("#reportLink").value.trim()); });
+
 async function lookupNumbers() {
   const text = bar.value.trim();
   if (!text) return toast("Paste a certificate image, or type GIA report numbers.");
-  if (!LOOKUP) return toast("Looking up by number is turned off on this portal.");
+  if (!LOOKUP) { openSettings("Paste a GIA report PDF link here first, then look up again."); return; }
   if (!/\d{7,10}/.test(text)) return toast("No GIA report numbers found (GIA numbers have 10 digits).");
   const btn = $("#goBtn"); btn.disabled = true; btn.textContent = "Looking up…";
   const chip = document.createElement("span"); chip.className = "chip run"; chip.textContent = "Downloading GIA reports…";

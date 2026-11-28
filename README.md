@@ -41,9 +41,10 @@ Paste GIA report numbers into the paste bar (one per line, or whole stock-list l
 are picked out) and press **Enter** or **Look up**. Each report PDF is downloaded and read from its
 text layer, so the row is exact; the 👁 viewer shows the PDF.
 
-- Source: `REPORT_PDF_URL`, `{report}` is replaced by the number. Default: the report-PDF link a supplier
-  includes in its public stock lists, ``.
-  Set `REPORT_PDF_URL=off` to hide the feature, or point it at another source.
+- Source: no link is built in. Open **⚙ Settings** and paste one link that opens a GIA report PDF with its
+  report number in it; the portal puts each number you look up in its place. The link is saved only on your
+  computer, in `local_settings.json` (excluded from git). `REPORT_PDF_URL` (with `{report}` in it) can be used
+  instead; `REPORT_PDF_URL=off` turns lookups off.
 - Downloads go one at a time, 1 second apart (`REPORT_PAUSE_SECONDS`), at most 50 numbers per lookup, and each
   PDF is saved in `reports/` (`REPORT_CACHE_DIR`), so a report is downloaded only once.
 - A PDF that is not for the requested number is rejected.

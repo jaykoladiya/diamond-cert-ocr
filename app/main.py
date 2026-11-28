@@ -90,6 +90,21 @@ async def lookup_reports(numbers: str = Form(...)):
     return {"results": results}
 
 
+@app.get("/api/settings")
+def get_settings():
+    return {"report_pdf_url": lookup.link_template(), "from_env": bool(os.environ.get("REPORT_PDF_URL"))}
+
+
+@app.post("/api/settings")
+async def set_settings(report_pdf_url: str = Form("")):
+    """Saved on this computer only (local_settings.json, not in git)."""
+    try:
+        template = lookup.save_link(report_pdf_url)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"report_pdf_url": template}
+
+
 @app.get("/api/report/{report}.pdf")
 def report_pdf(report: str):
     path = lookup.cached_pdf(report) if report.isdigit() else None

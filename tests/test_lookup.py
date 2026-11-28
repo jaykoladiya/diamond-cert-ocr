@@ -42,7 +42,8 @@ def svc(monkeypatch, tmp_path):
     monkeypatch.setattr(lookup.requests, "get", get)
     monkeypatch.setattr(lookup, "CACHE_DIR", tmp_path)
     monkeypatch.setattr(lookup, "PAUSE_SECONDS", 0)
-    monkeypatch.setattr(lookup, "REPORT_PDF_URL", "https://reports.example/pdf?reportno={report}")
+    monkeypatch.setattr(lookup, "SETTINGS_FILE", tmp_path / "local_settings.json")
+    monkeypatch.setenv("REPORT_PDF_URL", "https://reports.example/pdf?reportno={report}")
     return calls
 
 
@@ -76,9 +77,30 @@ def test_lookup_errors_are_per_number(svc):
 
 
 def test_lookup_can_be_turned_off(svc, monkeypatch):
-    monkeypatch.setattr(lookup, "REPORT_PDF_URL", "off")
+    monkeypatch.setenv("REPORT_PDF_URL", "off")
     r = TestClient(app).post("/api/lookup", data={"numbers": "2517492150"}).json()["results"]
-    assert "turned off" in r[0]["error"] and svc == []
+    assert "No report link set" in r[0]["error"] and svc == []
+
+
+def test_no_link_built_in(monkeypatch, tmp_path):
+    monkeypatch.delenv("REPORT_PDF_URL", raising=False)
+    monkeypatch.setattr(lookup, "SETTINGS_FILE", tmp_path / "local_settings.json")
+    assert lookup.link_template() == "" and not lookup.enabled()
+
+
+def test_link_pasted_in_settings(svc, monkeypatch, tmp_path):
+    monkeypatch.delenv("REPORT_PDF_URL", raising=False)
+    c = TestClient(app)
+    assert c.get("/api/settings").json()["report_pdf_url"] == ""
+    r = c.post("/api/settings", data={"report_pdf_url": "https://supplier.example/Show/Index?reportno=2517492150"})
+    assert r.json()["report_pdf_url"] == "https://supplier.example/Show/Index?reportno={report}"
+    assert (tmp_path / "local_settings.json").exists()
+    c.post("/api/lookup", data={"numbers": "6237628416"})
+    assert svc == ["https://supplier.example/Show/Index?reportno=6237628416"]
+    assert c.post("/api/settings", data={"report_pdf_url": "not a link"}).status_code == 400
+    assert c.post("/api/settings", data={"report_pdf_url": "https://x.example/no-number"}).status_code == 400
+    assert c.post("/api/settings", data={"report_pdf_url": ""}).json()["report_pdf_url"] == ""
+    assert not lookup.enabled()
 
 
 def test_no_numbers_is_a_clear_error(svc):
