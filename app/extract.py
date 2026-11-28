@@ -49,7 +49,7 @@ HEADERS = dict(FIELDS)
 KEY_FIELDS = ["report_number", "shape", "carat", "color", "clarity"]
 
 GRADE = r"(?:excellent|very\s*good|good|fair|poor|ideal|ex|vg|gd)"
-CLARITY = r"(?:FL|IF|VVS\s*[12]|VS\s*[12]|SI\s*[123]|I\s*[123]|P\s*[123])"
+CLARITY = r"(?:FL|IF|LC|VVS\s*[12]|VS\s*[12]|SI\s*[123]|I\s*[123]|P\s*[123])"
 FLUOR = r"(?:none|nil|negligible|inert|faint|very\s*slight|slight|medium|moderate|very\s*strong|strong)"
 
 # key -> (label regex, value validator regex or None)
@@ -168,6 +168,8 @@ def ocr_fix(key, v):
             return "IF"                                         # also "Internaly Flawles"
         if difflib.SequenceMatcher(None, words[:8], "flawless").ratio() >= 0.8:
             return "FL"
+        if difflib.SequenceMatcher(None, words[:11], "loupe clean").ratio() >= 0.8:
+            return "LC"                                         # older HRD/IGI term, kept as printed
         t = re.sub(r"\s+", "", v.upper()).replace("W", "VV")      # WS1 -> VVS1
         t = re.sub(r"^V{3,}", "VV", t)                            # WVS2 / VWVS2 -> VVS2
         t = re.sub(r"^(VV|V)5", r"\1S", t)                      # VV51 -> VVS1

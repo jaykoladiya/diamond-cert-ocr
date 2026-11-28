@@ -248,6 +248,7 @@ def test_misread_crown_height_label():
 @pytest.mark.parametrize("text,grade", [
     ("Clarity Grade | Flawless", "FL"), ("Clarity Grade ...... FLAWLESS", "FL"), ("Clarity Grade | Flawles", "FL"),
     ("Clarity Grade | Internally Flawless", "IF"), ("Clarity Grade | Internaly Flawles", "IF"),
+    ("Clarity Grade | Loupe Clean", "LC"), ("Clarity Grade | LOUPE CLEAN", "LC"),
     ("Clarity Grade | VS1\nCLARITY GRADE: | Internally Flawless | VVS1 | VVS2", "VS1"),
     ("CLARITY GRADE: | Internally Flawless | VVS1 | VVS2 | VS1 | VS2", None),   # only the printed scale
 ])

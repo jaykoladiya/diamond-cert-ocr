@@ -92,6 +92,10 @@ Codes follow Rapaport Trade's "Diamond Fields & Values" list
   (used for both) and "Proportions" instead of a cut grade (used as C).
 - Clr: D-Z letters as printed; fancy colours in words ("Fancy Yellowish Brown"), also split into Fancy Color /
   Fancy Intensity / Fancy Overtone.
+- Clrty: codes as printed; words are converted: Flawless → FL, Internally Flawless → IF, Loupe Clean → LC.
+  A printed grading scale ("CLARITY GRADE: Internally Flawless VVS1 VVS2 …") is never taken as the grade.
+- Confirmed conventions: Good is **G** (not GD); IGI's "Proportions" grade is used as **C** when there is no
+  cut grade; fancy colours are written in full words in **Clr**; Loupe Clean is **LC**.
 - Crown Height % and Pavilion Depth % as well as the angles (IGI prints "Crown Height - Angle 17.5% - 37.8°").
 - Ct. is a number shown with two decimals.
 
