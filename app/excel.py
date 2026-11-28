@@ -45,6 +45,27 @@ def _code(value, codes):
     return value
 
 
+def verify_url(lab, cert):
+    """Official online report check for a GIA or IGI report number (opens in a browser)."""
+    from urllib.parse import quote
+    cert = re.sub(r"\s+", "", str(cert or ""))
+    lab = str(lab or "").upper()
+    if not cert:
+        return None
+    if lab == "GIA":
+        return "https://www.gia.edu/report-check?reportno=" + quote(cert)
+    if lab == "IGI":
+        return "https://www.igi.org/verify-your-report/?r=" + quote(cert)
+    return None
+
+
+def _link(cell, rec):
+    url = verify_url(rec.get("lab"), rec.get("report_number"))
+    if url:
+        cell.hyperlink = url
+        cell.font = Font(color="0563C1", underline="single")
+
+
 def format_record(rec):
     """Record in the stock-list style: Round, EX/VG/G, NON/FNT/MED/STG/VST, carat as a number.
     Safe to apply more than once (already-short values pass through)."""
@@ -163,6 +184,8 @@ def build_workbook(records, template_bytes=None):
                     cell = ws.cell(row, col, rec.get(key))
                     if key in NUMERIC_FORMATS and isinstance(rec.get(key), (int, float)):
                         cell.number_format = NUMERIC_FORMATS[key]
+                    if key == "report_number":
+                        _link(cell, rec)
             buf = io.BytesIO()
             wb.save(buf)
             return buf.getvalue(), {"mode": "appended", "sheet": ws.title, "rows": len(records),
@@ -187,6 +210,8 @@ def build_workbook(records, template_bytes=None):
                 cell.number_format = NUMERIC_FORMATS[key]
             if c <= len(FRONT) and key != "shape":
                 cell.alignment = center
+            if key == "report_number":
+                _link(cell, rec)
     for c, (key, header) in enumerate(COLUMNS, 1):
         width = max([len(header)] + [len(str(rec.get(key) or "")) for rec in records])
         ws.column_dimensions[get_column_letter(c)].width = min(max(width + 2, 6 if c <= len(FRONT) else 10), 60)

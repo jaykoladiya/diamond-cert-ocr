@@ -78,6 +78,13 @@ Inscription · Comments · Source File. The on-screen table uses the same layout
 "Append to my Excel…" writes under the matching headers of your own sheet, including these short headers
 (Ct., Clr, Clrty, C, P, SYM, FLT, Cert), and adds any missing columns at the right.
 
+**Verify** (next to each GIA/IGI row) and the Cert cell in the exported Excel open the official report
+check in your browser: `https://www.gia.edu/report-check?reportno=…` / `https://www.igi.org/verify-your-report/?r=…`.
+The portal does not fetch those pages itself: both sites block automated access (Cloudflare/Akamai bot checks).
+Automatic lookups need the labs' official APIs: GIA's free [Report Results API](https://gia.edu/report-results-api)
+(requires a GIA laboratory client account and an access application in the GIA Client Portal); IGI lists an
+"API – Reports & PDFs" service on request.
+
 Key fields (Cert, Shape, Ct., Clr, Clrty) that could not be found are highlighted yellow.
 Click 👁 on a row to see the original certificate next to the OCR text and correct anything before exporting.
 

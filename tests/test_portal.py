@@ -145,3 +145,13 @@ def test_append_to_short_header_stock_list():
     assert [c.value for c in ws[3]][:10] == ["Round", 1.01, "G", "VS1", "EX", "EX", "VG", "FNT", "GIA", "2215487963"]
     assert [c.value for c in ws[2]][:2] == ["Round", 0.45]      # existing row untouched
     assert "Report Date" in info["added_columns"]               # the rest are added after
+
+
+def test_verify_links():
+    from app.excel import verify_url
+    assert verify_url("GIA", "2517492150") == "https://www.gia.edu/report-check?reportno=2517492150"
+    assert verify_url("IGI", "710597072") == "https://www.igi.org/verify-your-report/?r=710597072"
+    assert verify_url("HRD", "123") is None and verify_url("GIA", "") is None
+    data, _ = build_workbook([dict(fields("gia_natural.txt"), source_file="a.pdf")])
+    cert = load_workbook(io.BytesIO(data)).active["J2"]
+    assert cert.value == "2215487963" and cert.hyperlink.target.endswith("reportno=2215487963")
