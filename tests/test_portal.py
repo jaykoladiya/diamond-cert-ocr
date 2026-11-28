@@ -259,3 +259,25 @@ def test_clarity_words_and_printed_scales(text, grade):
 def test_colour_scale_is_not_a_grade():
     assert extract_fields("COLOR GRADE: | D | E | F | G | H")["color"] is None
     assert extract_fields("Color Grade | G\nCOLOR GRADE: D E F G H I J")["color"] == "G"
+
+
+@pytest.mark.parametrize("value,code", [   # Rapaport Trade's accepted fluorescence values
+    ("N", "NON"), ("NON", "NON"), ("No", "NON"), ("NIL", "NON"), ("FL0", "NON"), ("None", "NON"),
+    ("F", "FNT"), ("FNT", "FNT"), ("FA", "FNT"), ("FL1", "FNT"), ("Negligible", "FNT"), ("Faint", "FNT"),
+    ("M", "MED"), ("MED", "MED"), ("FL2", "MED"), ("S", "STG"), ("STG", "STG"), ("ST", "STG"), ("FL3", "STG"),
+    ("VS", "VST"), ("VST", "VST"), ("FL4", "VST"), ("SL", "SL"), ("SLI", "SL"), ("VSL", "VSL"), ("VSLG", "VSL"),
+    ("VSLT", "VSL"), ("Very Slight", "VSL")])
+def test_rapaport_fluorescence_values(value, code):
+    assert format_record(dict(extract_fields(f"Fluorescence | {value}")))["fluorescence"] == code
+    assert format_record({"fluorescence": value})["fluorescence"] == code   # typed into the table
+
+
+@pytest.mark.parametrize("label", ["Fluor", "Fluor.", "Fluo", "Flr", "Fluor Intensity", "Fluorescence Intensity",
+                                   "Flourescence", "Fluorescense"])
+def test_fluorescence_label_spellings(label):
+    assert format_record(dict(extract_fields(f"{label} | Medium Blue")))["fluorescence"] == "MED"
+
+
+def test_bare_no_does_not_break_report_numbers():
+    assert extract_fields("Report No. | 1234567890")["report_number"] == "1234567890"
+    assert extract_fields("FL | None")["fluorescence"] is None and extract_fields("Clarity | FL")["clarity"] == "FL"

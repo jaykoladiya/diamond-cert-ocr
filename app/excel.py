@@ -23,7 +23,7 @@ FANCY_INTENSITIES = ["fancy light", "fancy intense", "fancy vivid", "fancy deep"
                      "fancy", "faint", "light"]
 
 GRADE_CODES = {"ideal": "ID", "excellent": "EX", "very good": "VG", "good": "G", "fair": "F", "poor": "P"}
-FLUOR_CODES = {"none": "NON", "nil": "NON", "inert": "NON", "negligible": "NON", "faint": "FNT",
+FLUOR_CODES = {"none": "NON", "nil": "NON", "inert": "NON", "negligible": "FNT", "faint": "FNT",
                "very slight": "VSL", "slight": "SL",
                "medium": "MED", "moderate": "MED", "strong": "STG", "very strong": "VST"}
 # GIA/IGI "shape and cutting style" -> trade shape name; first match wins
@@ -97,7 +97,9 @@ def format_record(rec):
         m = re.search(r"\b(" + "|".join(FLUOR_COLORS) + r")\b", str(out["fluorescence"]), re.I)
         if m and not out.get("fluor_color"):  # "Medium Blue" -> FLT MED, Flr Color B
             out["fluor_color"] = FLUOR_COLORS[m.group(1).lower()]
-        out["fluorescence"] = _code(out["fluorescence"], FLUOR_CODES)
+        from .extract import RAP_FLUOR
+        raw = re.sub(r"[\s.]", "", str(out["fluorescence"])).upper()
+        out["fluorescence"] = _code(RAP_FLUOR.get(raw, out["fluorescence"]), FLUOR_CODES)
     if out.get("fluorescence") == "NON" and not out.get("fluor_color"):
         out["fluor_color"] = "N"
     color = str(out.get("color") or "")

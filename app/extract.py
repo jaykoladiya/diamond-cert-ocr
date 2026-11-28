@@ -71,7 +71,7 @@ LABELS = OrderedDict([
     ("polish", (r"polish", GRADE + r"\b.*")),
     ("proportions", (r"proportions?(?:\s*grade)?", GRADE + r"\b.*")),
     ("symmetry", (r"symmetry", GRADE + r"\b.*")),
-    ("fluorescence", (r"fluorescence(?:\s*intensity)?", FLUOR + r"\b.*")),
+    ("fluorescence", (r"(?:fl[ou]{1,2}r?e?s?c?[ae]n[cs]e|fluor\.?|fluo\.?|flr)(?:\s*intensity)?", FLUOR + r"\b.*")),
     ("depth_pct", (r"total\s*depth(?:\s*%)?|depth\s*(?:%|percentage)?", r"\d{2}(?:[.,]\d+)?\s*%?")),
     ("table_pct", (r"table\s*(?:size|width|diameter|%)?", r"\d{2}(?:[.,]\d+)?\s*%?")),
     # IGI: "Crown Height - Angle   17.5% - 37.8°" (both values on one line)
@@ -130,6 +130,8 @@ def to_tokens(text):
 
 
 def _is_label(token):
+    if re.fullmatch(r"\s*no\.?\s*", token, re.I):  # a bare "No" is a value (fluorescence "No"), not a label
+        return False
     return any(r.match(token) and not r.match(token).group(1).strip() for r in _LABEL_RES.values())
 
 
@@ -156,6 +158,14 @@ FANCY_WORDS = ["fancy", "light", "intense", "vivid", "deep", "dark", "brown", "b
 SHAPE_WORDS = ["round", "brilliant", "modified", "oval", "princess", "cushion", "emerald", "pear", "marquise",
                "heart", "radiant", "asscher", "square", "rectangular", "step", "triangular", "baguette",
                "octagonal", "european", "mine", "rose", "trilliant", "shield", "kite", "half", "moon"]
+# Rapaport Trade's accepted fluorescence values (help.rapaport.com "Diamond Fields & Values")
+RAP_FLUOR = {"N": "None", "NON": "None", "NO": "None", "NIL": "None", "FL0": "None", "NONE": "None",
+             "F": "Faint", "FNT": "Faint", "FA": "Faint", "FL1": "Faint",
+             "M": "Medium", "MED": "Medium", "FL2": "Medium",
+             "S": "Strong", "STG": "Strong", "ST": "Strong", "FL3": "Strong",
+             "VS": "Very Strong", "VST": "Very Strong", "VSTG": "Very Strong", "FL4": "Very Strong",
+             "SL": "Slight", "SLI": "Slight", "SLT": "Slight",
+             "VSL": "Very Slight", "VSLG": "Very Slight", "VSLT": "Very Slight"}
 GRADE_WORDS = ["excellent", "very good", "good", "fair", "poor", "ideal"]
 FLUOR_WORDS = ["none", "faint", "medium", "strong", "very strong", "negligible", "slight"]
 
@@ -191,6 +201,9 @@ def ocr_fix(key, v):
     if key in ("cut", "polish", "symmetry") and not re.match(GRADE + r"\b", v, re.I):
         return _fuzzy(v, GRADE_WORDS) or v
     if key == "fluorescence":
+        code = re.sub(r"[\s.]", "", v).upper()
+        if code in RAP_FLUOR:  # Rapaport codes: N, FNT, MED, STG, VST, SL, VSL, FL0-FL4, ...
+            return RAP_FLUOR[code]
         v = re.sub(r"(?i)([a-z])(blue|yellow|green|white|orange|red)\b", r"\1 \2", v)  # "MediumBlue"
         if not re.match(FLUOR + r"\b", v, re.I):
             fixed = _fuzzy(v.split()[0] if v.split() else v, FLUOR_WORDS)
