@@ -117,7 +117,7 @@ def test_pdf_pages():
 
 
 @pytest.mark.parametrize("shape,code", [
-    ("Round Brilliant", "Round"), ("Cushion Modified Brilliant", "Cushion"), ("Oval Brilliant", "Oval"),
+    ("Round Brilliant", "Round"), ("Cushion Modified Brilliant", "Cushion Modified"), ("Oval Brilliant", "Oval"),
     ("Square Modified Brilliant", "Princess"), ("Cut-Cornered Rectangular Modified Brilliant", "Radiant"),
     ("Emerald Cut", "Emerald"), ("Square Emerald Cut", "Square Emerald"), ("Pear Modified Brilliant", "Pear"),
     ("Round", "Round"), ("Some New Cut", "Some New Cut")])
@@ -196,3 +196,50 @@ def test_scanned_pdf_still_goes_to_ocr(monkeypatch):
     monkeypatch.setattr(ocr, "run_unlimited", lambda f, d: called.append(f) or ("x", "x"))
     ocr.run_ocr("scan.pdf", doc.tobytes())
     assert called == ["scan.pdf"]
+
+
+@pytest.mark.parametrize("gia,trade", [   # Rapaport Trade's "GIA shapes and trade shapes" table
+    ("Rectangular Modified Brilliant", "Radiant"), ("Cut-Cornered Square Modified Brilliant", "Square Radiant"),
+    ("Modified Square Brilliant", "Cushion Modified"), ("Square Modified Brilliant", "Princess"),
+    ("Round-Cornered Rectangular Modified Brilliant", "Other"), ("Modified Rectangular Brilliant", "Other"),
+    ("Cushion Brilliant", "Cushion Brilliant"), ("Trilliant", "Trilliant"), ("Old European Brilliant", "European Cut")])
+def test_rapaport_shapes(gia, trade):
+    assert format_record({"shape": gia})["shape"] == trade
+
+
+def test_fancy_colour_and_fluorescence_colour_split():
+    r = format_record({"color": "Fancy Light Brownish-Yellow", "fluorescence": "Medium Blue"})
+    assert (r["fancy_intensity"], r["fancy_overtone"], r["fancy_color"]) == ("Fancy Light", "Brownish", "Yellow")
+    assert (r["fluorescence"], r["fluor_color"]) == ("MED", "B")
+    r = format_record({"color": "E", "fluorescence": "None"})
+    assert r.get("fancy_color") is None and (r["fluorescence"], r["fluor_color"]) == ("NON", "N")
+
+
+def test_igi_crown_and_pavilion_pairs():
+    r = extract_fields("Crown Height - Angle | 17.5% - 37.8°\nPavilion Depth - Angle | 45% - 42")
+    assert (r["crown_height"], r["crown_angle"], r["pavilion_depth"], r["pavilion_angle"]) == (17.5, 37.8, 45, 42)
+    r = extract_fields("Crown Height | 14.5%\nPavilion Depth | 43%")   # IGI online summary
+    assert (r["crown_height"], r["pavilion_depth"]) == (14.5, 43)
+
+
+def test_append_understands_rapaport_column_names():
+    wb = Workbook(); s = wb.active
+    s.append(["StockNo", "Shp", "Sz", "Colr", "Clar", "CutGrade", "Finish", "Sym", "FluorIntensity", "FlrColor",
+              "Laboratory", "CertNum", "Dpth", "Tbl"])
+    buf = io.BytesIO(); wb.save(buf)
+    data, info = build_workbook([dict(fields("gia_natural.txt"), source_file="a.pdf")], buf.getvalue())
+    ws = load_workbook(io.BytesIO(data)).active
+    assert [c.value for c in ws[2]][:14] == [None, "Round", 1.01, "G", "VS1", "EX", "EX", "VG", "FNT", None,
+                                            "GIA", "2215487963", 61.6, 57]
+
+
+@pytest.mark.parametrize("text,flt,colour", [("MediumBlue", "MED", "B"), ("Slight (Green)", "SL", "G"),
+                                             ("Medum Blue", "MED", "B"), ("Very Slight", "VSL", None),
+                                             ("None", "NON", "N")])
+def test_fluorescence_with_colour(text, flt, colour):
+    r = format_record(dict(extract_fields(f"Fluorescence | {text}")))
+    assert (r["fluorescence"], r.get("fluor_color")) == (flt, colour)
+
+
+def test_misread_crown_height_label():
+    assert extract_fields("Crown Helght | 18%")["crown_height"] == 18

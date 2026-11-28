@@ -80,12 +80,19 @@ The first columns follow the stock-list format, with short codes:
 |---|---|---|---|---|---|---|---|---|---|
 | Round | 0.45 | F | IF | EX | EX | EX | NON | GIA | 1495557172 |
 
-- Shape: trade name from the report's "shape and cutting style" (Round Brilliant → Round,
-  Square Modified Brilliant → Princess, Cut-Cornered ... Modified Brilliant → Radiant, ...).
-- C / P / SYM: ID, EX, VG, G, F, P. FLT: NON, FNT, VSL (very slight), SLT (slight), MED, STG, VST
-  (fluorescence colour is dropped). IGI's online summary gives one "Polish And Symmetry" grade (used for both)
-  and "Proportions" instead of a cut grade (used as C).
-- Clr: D-Z letters as printed; fancy colours in words ("Fancy Yellowish Brown").
+Codes follow Rapaport Trade's "Diamond Fields & Values" list
+(https://help.rapaport.com/en/articles/5469769-rapaport-trade-formerly-rapnet-diamond-fields-values):
+
+- Shape: Rapaport shape names, including its table for GIA's square/rectangular brilliants: Rectangular
+  Modified Brilliant → Radiant, Cut-Cornered Square Modified Brilliant → Square Radiant, Square Modified
+  Brilliant → Princess, Modified Square Brilliant → Cushion Modified, Cushion Brilliant / Cushion Modified
+  kept apart, ambiguous Round-Cornered Rectangular Modified Brilliant → Other.
+- C / P / SYM: ID, EX, VG, G, F, P. FLT: NON, FNT, VSL, SL, MED, STG, VST, with the fluorescence colour in its
+  own column (Flr Color: N, B, W, Y, O, R, G). IGI's online summary gives one "Polish And Symmetry" grade
+  (used for both) and "Proportions" instead of a cut grade (used as C).
+- Clr: D-Z letters as printed; fancy colours in words ("Fancy Yellowish Brown"), also split into Fancy Color /
+  Fancy Intensity / Fancy Overtone.
+- Crown Height % and Pavilion Depth % as well as the angles (IGI prints "Crown Height - Angle 17.5% - 37.8°").
 - Ct. is a number shown with two decimals.
 
 After those come the remaining fields: Report Date · Natural / Lab-Grown · Growth Method (CVD/HPHT) ·
@@ -93,7 +100,9 @@ Measurements · Length/Width/Depth (mm) · Depth % · Table % · Crown Angle · 
 Inscription · Comments · Source File. The on-screen table uses the same layout and codes.
 
 "Append to my Excel…" writes under the matching headers of your own sheet, including these short headers
-(Ct., Clr, Clrty, C, P, SYM, FLT, Cert), and adds any missing columns at the right.
+(Ct., Clr, Clrty, C, P, SYM, FLT, Cert) and Rapaport Trade's accepted column names (Shp, Sz, Colr, Clar,
+CutGrade, Finish, Sym, FluorIntensity, FlrColor, CertNum, Meas, Dpth, Tbl, ...), and adds any missing columns
+at the right.
 
 **Verify** (next to each GIA/IGI row) and the Cert cell in the exported Excel open the official report
 check in your browser: `https://www.gia.edu/report-check?reportno=…` / `https://www.igi.org/verify-your-report/?r=…`.

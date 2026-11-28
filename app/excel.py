@@ -16,22 +16,37 @@ FRONT = [("shape", "Shape"), ("carat", "Ct."), ("color", "Clr"), ("clarity", "Cl
 _front_keys = {k for k, _ in FRONT}
 COLUMNS = FRONT + [(k, h) for k, h in FIELDS if k not in _front_keys] + [("source_file", "Source File")]
 NUMERIC_FORMATS = {"carat": "0.00", "length_mm": "0.00", "width_mm": "0.00", "depth_mm": "0.00",
-                   "depth_pct": "0.0", "table_pct": "0.0", "crown_angle": "0.0", "pavilion_angle": "0.0"}
+                   "depth_pct": "0.0", "table_pct": "0.0", "crown_angle": "0.0", "pavilion_angle": "0.0",
+                   "crown_height": "0.0", "pavilion_depth": "0.0"}
+FLUOR_COLORS = {"blue": "B", "white": "W", "yellow": "Y", "orange": "O", "red": "R", "green": "G"}
+FANCY_INTENSITIES = ["fancy light", "fancy intense", "fancy vivid", "fancy deep", "fancy dark", "very light",
+                     "fancy", "faint", "light"]
 
 GRADE_CODES = {"ideal": "ID", "excellent": "EX", "very good": "VG", "good": "G", "fair": "F", "poor": "P"}
 FLUOR_CODES = {"none": "NON", "nil": "NON", "inert": "NON", "negligible": "NON", "faint": "FNT",
-               "very slight": "VSL", "slight": "SLT",
+               "very slight": "VSL", "slight": "SL",
                "medium": "MED", "moderate": "MED", "strong": "STG", "very strong": "VST"}
 # GIA/IGI "shape and cutting style" -> trade shape name; first match wins
+# GIA/IGI "shape and cutting style" -> Rapaport Trade shape name; first match wins. GIA's
+# square/rectangular brilliants follow Rapaport's "GIA shapes and trade shapes" table.
 SHAPES = [
-    (r"cut[- ]?cornered.*(rectangular|square).*modified", "Radiant"),
-    (r"\bradiant", "Radiant"),
-    (r"\bprincess|square modified brilliant|rectangular modified brilliant", "Princess"),
-    (r"\basscher", "Asscher"), (r"square emerald", "Square Emerald"), (r"\bemerald", "Emerald"),
-    (r"\bround", "Round"), (r"\boval", "Oval"), (r"\bcushion", "Cushion"), (r"\bpear", "Pear"),
-    (r"\bmarquise", "Marquise"), (r"\bheart", "Heart"), (r"\btrilliant|\btriangular", "Triangle"),
-    (r"\bbaguette", "Baguette"), (r"old\s*european", "Old European"), (r"old\s*mine", "Old Mine"),
-    (r"\brose", "Rose Cut"),
+    (r"cut[- ]?cornered\s+square\s+modified", "Square Radiant"),
+    (r"cut[- ]?cornered\s+rectangular\s+modified|\bradiant", "Radiant"),
+    (r"round[- ]?cornered\s+rectangular\s+modified|modified\s+rectangular\s+brilliant", "Other"),
+    (r"^\s*rectangular\s+modified\s+brilliant", "Radiant"),
+    (r"^\s*modified\s+square\s+brilliant", "Cushion Modified"),
+    (r"\bprincess|square\s+modified\s+brilliant", "Princess"),
+    (r"\basscher", "Asscher"), (r"square\s+emerald", "Square Emerald"), (r"\bemerald", "Emerald"),
+    (r"cushion\s+modified", "Cushion Modified"), (r"cushion\s+brilliant", "Cushion Brilliant"),
+    (r"\bcushion", "Cushion Modified"),
+    (r"\bround", "Round"), (r"\boval", "Oval"), (r"\bpear", "Pear"),
+    (r"\bmarquise", "Marquise"), (r"\bheart", "Heart"), (r"\btrilliant", "Trilliant"),
+    (r"\btriang", "Triangle"), (r"tapered\s+baguette", "Tapered Baguette"), (r"\bbaguette", "Baguette"),
+    (r"old\s*european|\beuropean", "European Cut"), (r"old\s*mine", "Old Miner"),
+    (r"\brose", "Rose"), (r"\bhalf\s*moon", "Half Moon"), (r"\bkite", "Kite"), (r"\bshield", "Shield"),
+    (r"\bhexagon", "Hexagonal"), (r"\boctagon", "Octagonal"), (r"\bbriolette", "Briolette"),
+    (r"\btrapez", "Trapezoid"), (r"\blozenge", "Lozenge"), (r"\bstar\b", "Star"),
+    (r"^\s*square\b", "Square"),
 ]
 
 
@@ -79,7 +94,26 @@ def format_record(rec):
         if out.get(key):
             out[key] = _code(out[key], GRADE_CODES)
     if out.get("fluorescence"):
+        m = re.search(r"\b(" + "|".join(FLUOR_COLORS) + r")\b", str(out["fluorescence"]), re.I)
+        if m and not out.get("fluor_color"):  # "Medium Blue" -> FLT MED, Flr Color B
+            out["fluor_color"] = FLUOR_COLORS[m.group(1).lower()]
         out["fluorescence"] = _code(out["fluorescence"], FLUOR_CODES)
+    if out.get("fluorescence") == "NON" and not out.get("fluor_color"):
+        out["fluor_color"] = "N"
+    color = str(out.get("color") or "")
+    if color and not re.fullmatch(r"[D-Z](-[D-Z])?", color) and not out.get("fancy_color"):
+        # "Fancy Intense Yellowish Brown" -> intensity / overtone / colour, as Rapaport splits it
+        rest = color.lower()
+        for word in FANCY_INTENSITIES:
+            if rest.startswith(word):
+                out["fancy_intensity"] = word.title()
+                rest = rest[len(word):].strip()
+                break
+        words = rest.replace("-", " ").split()
+        overtones = [w for w in words[:-1] if w.endswith(("ish", "y"))]
+        out["fancy_overtone"] = " ".join(w.title() for w in overtones) or None
+        main = [w for w in words if w not in overtones]
+        out["fancy_color"] = " ".join(w.title() for w in main) or None
     for key in NUMERIC_FORMATS:
         v = out.get(key)
         if isinstance(v, str) and re.fullmatch(r"\s*\d+(?:[.,]\d+)?\s*", v):
@@ -109,14 +143,43 @@ ALIASES = {
     "fluorescence": ["fluorescence", "fluor", "flr", "fluo", "flt", "fl"],
     "depth_pct": ["depth %", "depth%", "total depth", "depth"],
     "table_pct": ["table %", "table%", "table"],
-    "crown_angle": ["crown angle", "crown"],
-    "pavilion_angle": ["pavilion angle", "pavilion"],
+    "crown_angle": ["crown angle", "crownangle"],
+    "pavilion_angle": ["pavilion angle", "pavilionangle", "pav angle"],
     "girdle": ["girdle"],
     "culet": ["culet"],
     "inscription": ["inscription", "inscriptions", "laser inscription"],
     "comments": ["comments", "comment", "remarks", "notes"],
     "source_file": ["source file", "file", "filename"],
+    "fluor_color": ["flr color", "fluor color", "fluorcolor", "fluo color", "flrcolor", "fluorescence color"],
+    "fancy_color": ["fancy color", "fancycolor", "fc main body", "fcmainbody", "fancycolormainbody"],
+    "fancy_intensity": ["fancy intensity", "fancy color intensity", "fancycolorintensity", "fcintensity",
+                        "fc intensity"],
+    "fancy_overtone": ["fancy overtone", "fancy color overtone", "fancycolorovertone", "fcovertone"],
+    "crown_height": ["crown height", "crown height %", "crown", "crown percent", "crownheight", "crownpct"],
+    "pavilion_depth": ["pavilion depth", "pavilion depth %", "pavilion %", "pavilionpct", "pavilion"],
 }
+# Rapaport Trade's accepted field names (help.rapaport.com, "Diamond Fields & Values")
+for _k, _names in {
+    "shape": ['shp'],
+    "carat": ['sz', 'caratsize', 'caratweight', 'ctsize', 'ctweight'],
+    "color": ['colr'],
+    "clarity": ['clearity', 'purity'],
+    "cut": ['cutgrade'],
+    "polish": ['finish'],
+    "symmetry": ['symetry', 'sym metry'],
+    "fluorescence": ['fluorescence intensity', 'fluorescenceintensity', 'fluor intensity', 'fluorintensity', 'fluo intensity', 'flrintensity'],
+    "report_number": ['certificate #', 'cert num', 'certid', 'certificateid', 'certificatenum', 'certificatenumber', 'certno', 'certnum'],
+    "measurements": ['meas'],
+    "length_mm": ['measlength', 'measurements length'],
+    "width_mm": ['measwidth', 'measurements width'],
+    "depth_mm": ['measdepth', 'measheight', 'measurements depth'],
+    "depth_pct": ['depth percent', 'depthpct', 'depthpercent', 'dpth', 'totaldepth'],
+    "table_pct": ['table percent', 'tablepct', 'tablepercent', 'tbl'],
+    "culet": ['culet size', 'culetsize', 'culet size', 'culetgrade', 'cullet'],
+    "comments": ['cert comment', 'certificate comment', 'lab comment', 'laboratory comment'],
+    "report_date": ['report issue date'],
+}.items():
+    ALIASES.setdefault(_k, []).extend(_names)
 
 
 def _norm(h):

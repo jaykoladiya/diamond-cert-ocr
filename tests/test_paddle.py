@@ -181,14 +181,14 @@ def test_real_igi_summary_fancy_colour():
     assert (f["report_number"], f["shape"], f["carat"]) == ("K7P44556", "Marquise", 0.44)  # read "Marqulse"
     assert f["clarity"] == "SI1"
     assert extract_fields("Color Grade | Natural Fancy Yellowish Browr")["color"] == "Fancy Yellowish Brown"
-    assert (f["cut"], f["polish"], f["symmetry"], f["fluorescence"]) == ("G", "G", "G", "SLT")
+    assert (f["cut"], f["polish"], f["symmetry"], f["fluorescence"]) == ("G", "G", "G", "SL")
     assert r["report_date"] == "2007-12-12"
 
 
 def test_real_gia_cushion_small_screenshot():
     lines, r = _real("gia_2023_cushion")
     f = format_record(dict(r))
-    assert (f["report_number"], f["shape"], f["carat"], f["clarity"]) == ("3456789012", "Cushion", 1.0, "VS1")
+    assert (f["report_number"], f["shape"], f["carat"], f["clarity"]) == ("3456789012", "Cushion Modified", 1.0, "VS1")
     assert (f["symmetry"], f["fluorescence"], f["cut"]) == ("G", "FNT", None)   # GIA gives no cut grade here
     assert r["report_date"] == "2023-10-27"
     # the colour value was not detected: its label stands alone, so the second read will run

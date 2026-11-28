@@ -24,14 +24,20 @@ FIELDS = [
     ("depth_mm", "Depth (mm)"),
     ("carat", "Carat Weight"),
     ("color", "Color"),
+    ("fancy_color", "Fancy Color"),
+    ("fancy_intensity", "Fancy Intensity"),
+    ("fancy_overtone", "Fancy Overtone"),
     ("clarity", "Clarity"),
     ("cut", "Cut"),
     ("polish", "Polish"),
     ("symmetry", "Symmetry"),
     ("fluorescence", "Fluorescence"),
+    ("fluor_color", "Flr Color"),
     ("depth_pct", "Depth %"),
     ("table_pct", "Table %"),
+    ("crown_height", "Crown Height %"),
     ("crown_angle", "Crown Angle"),
+    ("pavilion_depth", "Pavilion Depth %"),
     ("pavilion_angle", "Pavilion Angle"),
     ("girdle", "Girdle"),
     ("culet", "Culet"),
@@ -68,6 +74,11 @@ LABELS = OrderedDict([
     ("fluorescence", (r"fluorescence(?:\s*intensity)?", FLUOR + r"\b.*")),
     ("depth_pct", (r"total\s*depth(?:\s*%)?|depth\s*(?:%|percentage)?", r"\d{2}(?:[.,]\d+)?\s*%?")),
     ("table_pct", (r"table\s*(?:size|width|diameter|%)?", r"\d{2}(?:[.,]\d+)?\s*%?")),
+    # IGI: "Crown Height - Angle   17.5% - 37.8°" (both values on one line)
+    ("crown_pair", (r"crown\s*he[il1]ght\s*[-–/&]\s*angle", r"\d.*\d.*")),
+    ("pavilion_pair", (r"pavilion\s*depth\s*[-–/&]\s*angle", r"\d.*\d.*")),
+    ("crown_height", (r"crown\s*he[il1]ght(?:\s*%)?", r"\d{1,2}(?:[.,]\d+)?\s*%?")),
+    ("pavilion_depth", (r"pavilion\s*depth(?:\s*%)?", r"\d{1,2}(?:[.,]\d+)?\s*%?")),
     ("crown_angle", (r"crown\s*angle", r"\d{2}(?:[.,]\d+)?\s*°?.*")),
     ("pavilion_angle", (r"pavilion\s*angle", r"\d{2}(?:[.,]\d+)?\s*°?.*")),
     ("girdle", (r"girdle(?:\s*thickness)?", r"[A-Za-z].*")),
@@ -172,8 +183,11 @@ def ocr_fix(key, v):
         return t.upper() if re.fullmatch(r"[d-z]", t) else t
     if key in ("cut", "polish", "symmetry") and not re.match(GRADE + r"\b", v, re.I):
         return _fuzzy(v, GRADE_WORDS) or v
-    if key == "fluorescence" and not re.match(FLUOR + r"\b", v, re.I):
-        return _fuzzy(v, FLUOR_WORDS) or v
+    if key == "fluorescence":
+        v = re.sub(r"(?i)([a-z])(blue|yellow|green|white|orange|red)\b", r"\1 \2", v)  # "MediumBlue"
+        if not re.match(FLUOR + r"\b", v, re.I):
+            fixed = _fuzzy(v.split()[0] if v.split() else v, FLUOR_WORDS)
+            return f"{fixed} {' '.join(v.split()[1:])}".strip() if fixed else v
     return v
 
 
@@ -243,12 +257,15 @@ def normalise(key, v):
     if key in ("cut", "polish", "symmetry"):
         return _grade(v)
     if key == "fluorescence":
-        m = re.match(FLUOR + r"(?:\s+(blue|yellow|green|white|orange))?", v.strip(), re.I)
-        return _title(re.sub(r"\s+", " ", m.group(0))) if m else v
+        m = re.match(FLUOR + r"(?:\s*\(?\s*(blue|yellow|green|white|orange|red)\)?)?", v.strip(), re.I)
+        if not m:
+            return v
+        word = re.sub(r"\s+", " ", m.group(0)[:len(m.group(0)) - len(m.group(1) or "")].strip(" ("))
+        return _title(f"{word} {m.group(1)}" if m.group(1) else word)   # "MediumBlue" -> "Medium Blue"
     if key in ("depth_pct", "table_pct"):
         n = _num(v)
         return n
-    if key in ("crown_angle", "pavilion_angle"):
+    if key in ("crown_angle", "pavilion_angle", "crown_height", "pavilion_depth"):
         return _num(v)
     if key == "shape":
         v = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", v)  # RoundBrilliant
@@ -291,6 +308,12 @@ def extract_fields(text):
         found.setdefault("symmetry", found["polish_symmetry"])
     if "proportions" in found:      # IGI: proportions grade stands in for cut grade
         found.setdefault("cut", found["proportions"])
+    for pair, (pct, angle) in (("crown_pair", ("crown_height", "crown_angle")),
+                               ("pavilion_pair", ("pavilion_depth", "pavilion_angle"))):
+        nums = re.findall(r"\d{1,2}(?:[.,]\d+)?", found.get(pair, ""))
+        if len(nums) >= 2:
+            found.setdefault(pct, nums[0])
+            found.setdefault(angle, nums[1])
     out = OrderedDict((k, None) for k in FIELD_KEYS)
     for k in FIELD_KEYS:
         if k in found:
