@@ -27,6 +27,11 @@ Three OCR engines. Pick one in the **Engine** menu at the top of the page, or le
 
 Linux / macOS: `pip install -r requirements.txt && ./run.sh`.
 
+### Digital PDFs: no OCR at all
+Report PDFs downloaded from GIA (and most lab PDFs) carry a text layer. The portal reads that text directly,
+so every value is exact and instant, whichever engine is selected. Scans and photos saved as PDF have no
+text layer and go through OCR as usual. (`PDF_TEXT=0` turns this off.)
+
 ### How the Windows OCR and PaddleOCR engines read a certificate
 1. Each page is straightened (photos are often tilted a few degrees). Windows OCR also gets the page
    upscaled, as PowerToys does, because small print reads better larger.

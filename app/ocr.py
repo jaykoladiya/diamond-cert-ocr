@@ -96,9 +96,33 @@ def build_payload(pages, crop_mode=True):
     return payload
 
 
+def pdf_text(data):
+    """Text layer of a digital PDF (GIA/IGI download their reports with one), in reading
+    order, or None for scans/photos saved as PDF. Exact characters: no OCR needed."""
+    try:
+        import pymupdf as fitz
+    except ImportError:  # older PyMuPDF
+        import fitz
+    from .extract import KEY_FIELDS, extract_fields
+    try:
+        doc = fitz.open(stream=data, filetype="pdf")
+    except Exception:  # noqa: BLE001 - not a readable PDF: let OCR report it
+        return None
+    text = "\n".join(page.get_text("text") for i, page in enumerate(doc) if i < MAX_PAGES)
+    doc.close()
+    found = extract_fields(text)
+    # use it only if it really carries the grading (not just a scanned image with a caption)
+    return text if sum(found[k] not in (None, "") for k in KEY_FIELDS) >= 3 else None
+
+
 def run_ocr(filename, data, engine=None):
     """OCR one uploaded file. `engine` picks one explicitly ("unlimited", "windows",
-    "paddle"); otherwise the active backend is used. Returns (raw_output, text)."""
+    "paddle"); otherwise the active backend is used. A digital PDF is read from its text
+    layer instead, whatever the engine. Returns (raw_output, text)."""
+    if filename.lower().endswith(".pdf") and os.environ.get("PDF_TEXT", "1") != "0":
+        text = pdf_text(data)
+        if text:
+            return text, text
     backend = engine if engine and engine != "auto" else active_backend()
     if backend in ("windows", "paddle"):
         mod = ocr_windows if backend == "windows" else ocr_paddle

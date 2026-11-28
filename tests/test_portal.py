@@ -91,9 +91,9 @@ class _FakeResp:
         return {"choices": [{"message": {"content": (FIX / "igi_labgrown.txt").read_text()}}]}
 
 
-def _png():
+def _png(w=40, h=40):
     from PIL import Image
-    b = io.BytesIO(); Image.new("RGB", (40, 40), "white").save(b, "PNG"); return b.getvalue()
+    b = io.BytesIO(); Image.new("RGB", (w, h), "white").save(b, "PNG"); return b.getvalue()
 
 
 def test_api_extract_and_export(client):
@@ -155,3 +155,44 @@ def test_verify_links():
     data, _ = build_workbook([dict(fields("gia_natural.txt"), source_file="a.pdf")])
     cert = load_workbook(io.BytesIO(data)).active["J2"]
     assert cert.value == "2215487963" and cert.hyperlink.target.endswith("reportno=2215487963")
+
+
+def _text_pdf(lines):
+    import pymupdf
+    doc = pymupdf.open(); page = doc.new_page()
+    for i, line in enumerate(lines):
+        page.insert_text((40, 60 + 16 * i), line, fontsize=10)
+    return doc.tobytes()
+
+
+def test_digital_pdf_read_from_text_layer_without_ocr(monkeypatch):
+    def no_ocr(*a, **k):
+        raise AssertionError("OCR must not run for a digital PDF")
+    monkeypatch.setattr(ocr, "active_backend", no_ocr)
+    monkeypatch.setattr(ocr, "run_unlimited", no_ocr)
+    pdf = _text_pdf(["GIA NATURAL DIAMOND GRADING REPORT", "February 24, 2025",
+                     "GIA Report Number ........................ 1234567890",
+                     "Shape and Cutting Style .................. Round Brilliant",
+                     "Measurements .............................. 5.41 - 5.45 x 3.13 mm",
+                     "Carat Weight .............................. 0.55 carat",
+                     "Color Grade ............................... E",
+                     "Clarity Grade ............................. VVS1",
+                     "Cut Grade ................................. Excellent",
+                     "Polish .................................... Excellent",
+                     "Symmetry .................................. Excellent",
+                     "Fluorescence .............................. None"])
+    r = format_record(dict(extract_fields(ocr.run_ocr("gia.pdf", pdf, engine="paddle")[1])))
+    assert [r[k] for k in ("shape", "carat", "color", "clarity", "cut", "polish", "symmetry", "fluorescence",
+                           "lab", "report_number", "report_date")] == \
+        ["Round", 0.55, "E", "VVS1", "EX", "EX", "EX", "NON", "GIA", "1234567890", "2025-02-24"]
+
+
+def test_scanned_pdf_still_goes_to_ocr(monkeypatch):
+    import pymupdf
+    doc = pymupdf.open(); page = doc.new_page()
+    page.insert_image(page.rect, stream=_png(600, 800))   # image only, no text layer
+    called = []
+    monkeypatch.setattr(ocr, "active_backend", lambda: "unlimited")
+    monkeypatch.setattr(ocr, "run_unlimited", lambda f, d: called.append(f) or ("x", "x"))
+    ocr.run_ocr("scan.pdf", doc.tobytes())
+    assert called == ["scan.pdf"]
